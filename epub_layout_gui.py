@@ -10,6 +10,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import fitz
 
+from epub_batch_model import BatchProject
 from epub_layout_model import LayoutEntry, LayoutModel
 
 
@@ -30,6 +31,8 @@ class EpubLayoutApp:
         self.title_var = tk.StringVar(value="")
         self.author_var = tk.StringVar(value="")
         self.language_var = tk.StringVar(value="zh-Hant")
+        self.batch_project: BatchProject | None = None
+        self.batch_output_dir: Path | None = None
 
         self._build_ui()
         self.root.bind_all("<Command-z>", lambda _event: self.recover_last_deleted())
@@ -52,8 +55,11 @@ class EpubLayoutApp:
         main.add(left, weight=1)
         ttk.Label(left, text="Spine order").pack(anchor=tk.W)
         self.page_list = tk.Listbox(left, exportselection=False, activestyle="dotbox", selectmode=tk.EXTENDED)
-        self.page_list.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        self.page_list.pack(fill=tk.BOTH, expand=True, pady=(6, 12))
         self.page_list.bind("<<ListboxSelect>>", lambda _event: self.refresh_preview())
+        ttk.Label(left, text="Batch queue").pack(anchor=tk.W)
+        self.batch_list = tk.Listbox(left, exportselection=False, height=7)
+        self.batch_list.pack(fill=tk.X, pady=(6, 0))
 
         center = ttk.Frame(main, padding=8)
         main.add(center, weight=3)
@@ -98,6 +104,12 @@ class EpubLayoutApp:
         ttk.Entry(right, textvariable=self.language_var).pack(fill=tk.X)
         ttk.Button(right, text="Set Selected As Cover", command=self.set_selected_as_cover).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(right, text="Export Selected Images...", command=self.export_selected_images).pack(fill=tk.X, pady=(8, 0))
+        ttk.Separator(right).pack(fill=tk.X, pady=16)
+        ttk.Label(right, text="Batch project").pack(anchor=tk.W)
+        ttk.Button(right, text="Use Current Layout As Template", command=self.use_current_layout_as_batch_template).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Add PDFs...", command=self.add_batch_pdfs).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Validate Batch...", command=self.validate_batch).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Export Ready...", command=self.export_ready_batch).pack(fill=tk.X, pady=(8, 0))
         ttk.Separator(right).pack(fill=tk.X, pady=16)
         ttk.Label(
             right,
@@ -321,6 +333,87 @@ class EpubLayoutApp:
                 messagebox.showinfo("Export selected images", "No exportable images selected.")
         except Exception as exc:
             messagebox.showerror("Export selected images failed", str(exc))
+
+    def use_current_layout_as_batch_template(self) -> None:
+        if self.model is None:
+            return
+        self._store_metadata_fields()
+        self.batch_project = BatchProject.from_template(self.model)
+        self.refresh_batch_list()
+        self.status.set("Batch template captured from current layout.")
+
+    def add_batch_pdfs(self) -> None:
+        if self.batch_project is None:
+            if self.model is None:
+                return
+            self.use_current_layout_as_batch_template()
+        filenames = filedialog.askopenfilenames(
+            title="Add PDFs to Batch",
+            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+            initialdir=str(Path.cwd()),
+        )
+        if not filenames or self.batch_project is None:
+            return
+        for filename in filenames:
+            self.batch_project.add_pdf(Path(filename))
+        self.refresh_batch_list()
+        self.status.set(f"Added {len(filenames)} PDFs to batch.")
+
+    def validate_batch(self) -> None:
+        if self.batch_project is None:
+            return
+        output_dir = self._batch_output_dir()
+        if output_dir is None:
+            return
+        self.batch_project.validate_all(output_dir)
+        self.refresh_batch_list()
+        self.status.set("Batch validation complete.")
+
+    def export_ready_batch(self) -> None:
+        if self.batch_project is None:
+            return
+        output_dir = self._batch_output_dir()
+        if output_dir is None:
+            return
+        self.status.set("Batch exporting ready items...")
+        self.root.update_idletasks()
+
+        def worker() -> None:
+            try:
+                summary = self.batch_project.export_ready(output_dir)
+                self.root.after(0, lambda: self._batch_project_done(summary, output_dir))
+            except Exception as exc:
+                self.root.after(0, lambda: self._export_failed(exc))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def refresh_batch_list(self) -> None:
+        if not hasattr(self, "batch_list"):
+            return
+        self.batch_list.delete(0, tk.END)
+        if self.batch_project is None:
+            return
+        for item in self.batch_project.items:
+            detail = f" ({'; '.join(item.warnings)})" if item.warnings else ""
+            if item.error:
+                detail = f" ({item.error})"
+            self.batch_list.insert(tk.END, f"{item.status} {item.pdf_path.name}{detail}")
+
+    def _batch_output_dir(self) -> Path | None:
+        initial = getattr(self, "batch_output_dir", None) or getattr(self, "output_dir", Path.cwd())
+        output_dir_name = filedialog.askdirectory(title="Batch output directory", initialdir=str(initial))
+        if not output_dir_name:
+            return None
+        self.batch_output_dir = Path(output_dir_name)
+        return self.batch_output_dir
+
+    def _batch_project_done(self, summary: dict[str, int], output_dir: Path) -> None:
+        self.refresh_batch_list()
+        self.status.set(
+            f"Batch exported {summary['exported']} EPUB files; "
+            f"{summary['failed']} failed, {summary['skipped']} skipped."
+        )
+        messagebox.showinfo("Batch complete", f"Exported ready EPUB files to:\n{output_dir}")
 
     def normalize_export_order(self) -> None:
         if self.model is None:

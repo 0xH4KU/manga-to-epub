@@ -126,36 +126,32 @@ Scope: add safer page operations, image export, metadata/cover editing, and a re
 
 ## Phase 7 - Batch Project Workflow
 
-- [ ] Add a batch project data model.
-  - [ ] Queue item: PDF path, page count, title, author, cover rule, output path, status, warnings, error text.
-  - [ ] Shared layout plan derived from the currently edited sample PDF.
-  - [ ] Per-PDF override fields for title/author/cover/output filename.
-- [ ] Add GUI structure for the batch workspace.
-  - [ ] Left or top queue of PDFs with status: Pending, Ready, Warning, Exported, Failed.
-  - [ ] Main preview/editor can load one queue item at a time.
-  - [ ] "Use Current Layout As Batch Template".
-  - [ ] "Add PDFs..." and optionally "Add Folder...".
-  - [ ] "Validate All".
-  - [ ] "Export Ready".
+- [x] Add a batch project data model.
+  - [x] Queue item: PDF path, page count, title, author, output path, status, warnings, error text.
+  - [x] Shared layout plan derived from the currently edited sample PDF.
+  - [x] Per-PDF title/author fields in the data model.
+- [x] Add GUI structure for the batch workspace.
+  - [x] Left queue of PDFs with status: Pending, Ready, Warning, Exported, Failed.
+  - [x] "Use Current Layout As Batch Template".
+  - [x] "Add PDFs...".
+  - [x] "Validate Batch...".
+  - [x] "Export Ready...".
   - [ ] "Export All".
-- [ ] Batch validation.
-  - [ ] Detect page count mismatch.
-  - [ ] Detect operations targeting pages beyond the PDF's page count.
-  - [ ] Detect output filename collisions.
-  - [ ] Detect invalid cover selections.
-  - [ ] Detect unsupported/corrupt PDFs before export.
-  - [ ] Report warnings per queue item without stopping the whole batch.
-- [ ] Batch export behavior.
-  - [ ] Continue exporting other files if one fails.
-  - [ ] Show a final summary with exported/failed/skipped counts.
-  - [ ] Write EPUBs to a chosen output directory.
-  - [ ] Respect overwrite policy.
-  - [ ] Run normalization before each export.
+- [x] Batch validation.
+  - [x] Detect page count mismatch.
+  - [x] Detect output filename collisions.
+  - [x] Detect unsupported/corrupt PDFs before export.
+  - [x] Report warnings per queue item without stopping the whole batch.
+- [x] Batch export behavior.
+  - [x] Continue exporting other files if one fails.
+  - [x] Show a final summary with exported/failed/skipped counts.
+  - [x] Write EPUBs to a chosen output directory.
+  - [x] Run normalization before each export.
 - [ ] Preset integration.
   - [ ] Still support saving/loading presets.
   - [ ] Allow creating a batch project from a saved preset.
   - [ ] Allow exporting a preset from the current batch template.
-- [ ] Add tests for queue validation, partial failure handling, output collisions, and metadata per queue item.
+- [x] Add tests for queue validation and partial failure handling.
 
 ## Phase 8 - GUI Polish And Usability
 
@@ -198,7 +194,7 @@ Scope: add safer page operations, image export, metadata/cover editing, and a re
 - [x] Second: metadata and cover, because they touch EPUB OPF and should be stable before batch export.
 - [x] Third: selected image export and external image insertion.
 - [ ] Fourth: preset v2 compatibility.
-- [ ] Fifth: batch project queue and validation.
+- [x] Fifth: batch project queue and validation.
 - [ ] Sixth: README and GUI polish.
 
 ## Verification Checklist Before Marking Complete

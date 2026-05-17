@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
 
@@ -99,6 +100,25 @@ class _FakeDeleteModel:
 
     def export_selected_images(self, indexes, output_dir):
         return [output_dir / f"{index + 1:04d}.jpg" for index in indexes], 0
+
+
+class _FakeBatchProject:
+    def __init__(self):
+        self.items = []
+        self.validated_dir = None
+
+    def add_pdf(self, path):
+        item = SimpleNamespace(pdf_path=path, status="Pending", warnings=[], error=None)
+        self.items.append(item)
+        return item
+
+    def validate_all(self, output_dir):
+        self.validated_dir = output_dir
+        for item in self.items:
+            item.status = "Ready"
+
+    def export_ready(self, output_dir):
+        return {"exported": len(self.items), "failed": 0, "skipped": 0}
 
 
 def _entry(label, is_blank=False):
@@ -324,6 +344,31 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual(["Page 1", "Image 2"], [entry.label for entry in app.model.entries])
         self.assertTrue(app.preserved_yview)
         self.assertEqual("Inserted image: extra.png", app.status.value)
+
+    def test_batch_add_pdfs_updates_queue_list(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.batch_project = _FakeBatchProject()
+        app.batch_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+
+        with patch("epub_layout_gui.filedialog.askopenfilenames", return_value=["/tmp/a.pdf", "/tmp/b.pdf"]):
+            app.add_batch_pdfs()
+
+        self.assertEqual(["Pending a.pdf", "Pending b.pdf"], app.batch_list.items)
+        self.assertEqual("Added 2 PDFs to batch.", app.status.value)
+
+    def test_batch_validate_uses_selected_output_dir(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.batch_project = _FakeBatchProject()
+        app.batch_project.add_pdf(Path("/tmp/a.pdf"))
+        app.batch_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+
+        with patch("epub_layout_gui.filedialog.askdirectory", return_value="/tmp/out"):
+            app.validate_batch()
+
+        self.assertEqual(Path("/tmp/out"), app.batch_project.validated_dir)
+        self.assertEqual(["Ready a.pdf"], app.batch_list.items)
 
 
 if __name__ == "__main__":
