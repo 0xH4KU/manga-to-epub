@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -64,6 +65,62 @@ class LayoutModel:
             raise IndexError("Deletion index out of range")
         del self.entries[index]
 
+    def delete_first(self, count: int) -> list[tuple[int, LayoutEntry]]:
+        if count <= 0:
+            raise ValueError("Delete count must be greater than zero")
+        return self.delete_range(0, min(count, len(self.entries)) - 1)
+
+    def delete_last(self, count: int) -> list[tuple[int, LayoutEntry]]:
+        if count <= 0:
+            raise ValueError("Delete count must be greater than zero")
+        start = max(len(self.entries) - count, 0)
+        return self.delete_range(start, len(self.entries) - 1)
+
+    def delete_range(self, start: int, end: int) -> list[tuple[int, LayoutEntry]]:
+        if not self.entries:
+            raise ValueError("Cannot delete from an empty layout")
+        if start < 0 or end < 0:
+            raise ValueError("Delete range cannot be negative")
+        if start > end:
+            raise ValueError("Delete range start must be before end")
+        if start >= len(self.entries):
+            raise ValueError("Delete range starts after the end of the layout")
+        end = min(end, len(self.entries) - 1)
+        deleted = [(index, self.entries[index]) for index in range(start, end + 1)]
+        del self.entries[start : end + 1]
+        return deleted
+
+    def normalized_pages(self) -> list[EpubPage]:
+        padding = max(4, len(str(len(self.entries))))
+        blank_index = 0
+        pages: list[EpubPage] = []
+        for spine_index, entry in enumerate(self.entries, start=1):
+            page_number = f"{spine_index:0{padding}d}"
+            if entry.is_blank:
+                blank_index += 1
+                item_id = f"blank-{blank_index:04d}"
+                pages.append(
+                    dataclasses.replace(
+                        entry.page,
+                        index=spine_index,
+                        xhtml_href=f"xhtml/{item_id}.xhtml",
+                        item_id=item_id,
+                    )
+                )
+                continue
+
+            ext = Path(entry.page.image_href or "").suffix.lower().lstrip(".")
+            pages.append(
+                dataclasses.replace(
+                    entry.page,
+                    index=spine_index,
+                    image_href=f"images/page-{page_number}.{ext}",
+                    xhtml_href=f"xhtml/page-{page_number}.xhtml",
+                    item_id=f"page-{spine_index:04d}",
+                )
+            )
+        return pages
+
     def save_preset(self, preset_path: Path) -> None:
         source_order = [entry.source_index for entry in self.entries if entry.source_index is not None]
         deleted_source_pages = sorted(set(range(1, self.source_page_count + 1)) - set(source_order))
@@ -91,7 +148,7 @@ class LayoutModel:
     def export_epub(self, epub_path: Path, overwrite: bool = False, title: str | None = None) -> dict[str, int]:
         counts = self._counts()
         return write_epub_from_pages(
-            [entry.page for entry in self.entries],
+            self.normalized_pages(),
             epub_path,
             source_path=self.source_path,
             title=title or self.source_path.stem,

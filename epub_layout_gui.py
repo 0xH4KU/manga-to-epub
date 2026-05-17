@@ -6,7 +6,7 @@ from __future__ import annotations
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import fitz
 
@@ -24,7 +24,7 @@ class EpubLayoutApp:
         self.output_dir = Path.cwd() / "epub_layout_gui_exports"
         self.photo_refs: list[tk.PhotoImage] = []
         self.thumbnail_cache: dict[int, tk.PhotoImage] = {}
-        self.deleted_entries: list[tuple[int, LayoutEntry]] = []
+        self.deleted_entries: list[list[tuple[int, LayoutEntry]]] = []
         self.status = tk.StringVar(value="Open a PDF to begin.")
         self.apple_preview = tk.BooleanVar(value=True)
 
@@ -77,6 +77,12 @@ class EpubLayoutApp:
         ttk.Separator(right).pack(fill=tk.X, pady=16)
         ttk.Button(right, text="Quick: Blank Before Cover", command=self.quick_blank_before_cover).pack(fill=tk.X)
         ttk.Button(right, text="Quick: Blank After Cover", command=self.quick_blank_after_cover).pack(fill=tk.X, pady=(8, 0))
+        ttk.Separator(right).pack(fill=tk.X, pady=16)
+        ttk.Label(right, text="Quick delete").pack(anchor=tk.W)
+        ttk.Button(right, text="Delete First...", command=self.ask_delete_first).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Delete Last...", command=self.ask_delete_last).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Delete Range...", command=self.ask_delete_range).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Normalize Export Order", command=self.normalize_export_order).pack(fill=tk.X, pady=(8, 0))
         ttk.Separator(right).pack(fill=tk.X, pady=16)
         ttk.Label(
             right,
@@ -156,7 +162,7 @@ class EpubLayoutApp:
         if not entry.is_blank and not messagebox.askyesno("Delete page", f"Remove {entry.label} from this export?"):
             return
         try:
-            self.deleted_entries.append((index, entry))
+            self.deleted_entries.append([(index, entry)])
             self.model.delete_entry(index)
             self.refresh_list(preserve_yview=True)
             if self.model.entries:
@@ -169,14 +175,21 @@ class EpubLayoutApp:
     def recover_last_deleted(self) -> None:
         if self.model is None or not self.deleted_entries:
             return
-        original_index, entry = self.deleted_entries.pop()
-        index = min(max(original_index, 0), len(self.model.entries))
-        self.model.entries.insert(index, entry)
+        group = self.deleted_entries.pop()
+        restored_indexes: list[int] = []
+        for original_index, entry in sorted(group, key=lambda item: item[0]):
+            index = min(max(original_index, 0), len(self.model.entries))
+            self.model.entries.insert(index, entry)
+            restored_indexes.append(index)
         self.refresh_list(preserve_yview=True)
         self.page_list.selection_clear(0, tk.END)
-        self.page_list.selection_set(index)
+        self.page_list.selection_set(restored_indexes[0])
         self.refresh_preview()
-        self.status.set(f"Recovered {entry.label} at position {index + 1}.")
+        if len(group) == 1:
+            entry = group[0][1]
+            self.status.set(f"Recovered {entry.label} at position {restored_indexes[0] + 1}.")
+        else:
+            self.status.set(f"Recovered {len(group)} pages.")
 
     def quick_blank_before_cover(self) -> None:
         if self.model is None:
@@ -197,6 +210,75 @@ class EpubLayoutApp:
         self.page_list.selection_set(1)
         self.refresh_preview()
         self.status.set("Inserted one blank page after cover.")
+
+    def ask_delete_first(self) -> None:
+        count = self._ask_positive_integer("Delete first pages", "How many pages from the start?")
+        if count is not None:
+            self.quick_delete_first(count)
+
+    def ask_delete_last(self) -> None:
+        count = self._ask_positive_integer("Delete last pages", "How many pages from the end?")
+        if count is not None:
+            self.quick_delete_last(count)
+
+    def ask_delete_range(self) -> None:
+        start = self._ask_positive_integer("Delete range", "Start spine position?")
+        if start is None:
+            return
+        end = self._ask_positive_integer("Delete range", "End spine position?")
+        if end is not None:
+            self.quick_delete_range(start, end)
+
+    def quick_delete_first(self, count: int) -> None:
+        if self.model is None:
+            return
+        self._delete_group(lambda: self.model.delete_first(count), f"Deleted first {count} pages.")
+
+    def quick_delete_last(self, count: int) -> None:
+        if self.model is None:
+            return
+        self._delete_group(lambda: self.model.delete_last(count), f"Deleted last {count} pages.")
+
+    def quick_delete_range(self, start: int, end: int) -> None:
+        if self.model is None:
+            return
+        self._delete_group(lambda: self.model.delete_range(start - 1, end - 1), f"Deleted pages {start}-{end}.")
+
+    def normalize_export_order(self) -> None:
+        if self.model is None:
+            return
+        self.refresh_list(preserve_yview=True)
+        self.refresh_preview()
+        self.status.set("Export order will be normalized automatically.")
+
+    def _delete_group(self, delete_action, status_message: str) -> None:
+        if self.model is None:
+            return
+        try:
+            deleted = delete_action()
+            if not deleted:
+                return
+            if any(not entry.is_blank for _index, entry in deleted):
+                labels = ", ".join(entry.label for _index, entry in deleted[:5])
+                suffix = "" if len(deleted) <= 5 else f", and {len(deleted) - 5} more"
+                if not messagebox.askyesno("Delete pages", f"Remove {labels}{suffix} from this export?"):
+                    for original_index, entry in sorted(deleted, key=lambda item: item[0]):
+                        index = min(max(original_index, 0), len(self.model.entries))
+                        self.model.entries.insert(index, entry)
+                    return
+            self.deleted_entries.append(deleted)
+            self.refresh_list(preserve_yview=True)
+            self.page_list.selection_clear(0, tk.END)
+            if self.model.entries:
+                first_deleted = min(index for index, _entry in deleted)
+                self.page_list.selection_set(min(first_deleted, len(self.model.entries) - 1))
+            self.refresh_preview()
+            self.status.set(status_message)
+        except Exception as exc:
+            messagebox.showerror("Delete pages failed", str(exc))
+
+    def _ask_positive_integer(self, title: str, prompt: str) -> int | None:
+        return simpledialog.askinteger(title, prompt, minvalue=1, parent=self.root)
 
     def export_epub(self) -> None:
         if self.model is None or self.pdf_path is None:

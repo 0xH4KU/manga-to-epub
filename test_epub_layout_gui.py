@@ -72,6 +72,24 @@ class _FakeDeleteModel:
         self.deleted.append(index)
         del self.entries[index]
 
+    def delete_first(self, count):
+        deleted = []
+        for offset in range(count):
+            entry = self.entries.pop(0)
+            deleted.append((offset, entry))
+        return deleted
+
+    def delete_last(self, count):
+        start = len(self.entries) - count
+        deleted = [(start + offset, entry) for offset, entry in enumerate(self.entries[start:])]
+        del self.entries[start:]
+        return deleted
+
+    def delete_range(self, start, end):
+        deleted = [(index, self.entries[index]) for index in range(start, end + 1)]
+        del self.entries[start : end + 1]
+        return deleted
+
 
 def _entry(label, is_blank=False):
     return SimpleNamespace(label=label, is_blank=is_blank)
@@ -153,7 +171,7 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.delete_selected_entry()
 
         self.assertEqual([0], app.model.deleted)
-        self.assertEqual([(0, "Blank 1")], [(index, entry.label) for index, entry in app.deleted_entries])
+        self.assertEqual([[(0, "Blank 1")]], [[(index, entry.label) for index, entry in group] for group in app.deleted_entries])
         self.assertEqual(0, app.page_list.selection)
         self.assertTrue(app.preserved_yview)
         self.assertTrue(app.preview_refreshed)
@@ -182,7 +200,7 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         page_2 = _entry("Page 2")
         page_3 = _entry("Page 3")
         app.model = _FakeDeleteModel([page_1, page_3])
-        app.deleted_entries = [(1, page_2)]
+        app.deleted_entries = [[(1, page_2)]]
         app.page_list = _FakeListbox(selection=0)
         app.status = _FakeStatus()
         app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
@@ -203,7 +221,7 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         page_2 = _entry("Page 2")
         page_9 = _entry("Page 9")
         app.model = _FakeDeleteModel([page_1])
-        app.deleted_entries = [(1, page_2), (8, page_9)]
+        app.deleted_entries = [[(1, page_2)], [(8, page_9)]]
         app.page_list = _FakeListbox(selection=0)
         app.status = _FakeStatus()
         app.refresh_list = lambda preserve_yview=False: None
@@ -212,8 +230,44 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.recover_last_deleted()
 
         self.assertEqual(["Page 1", "Page 9"], [entry.label for entry in app.model.entries])
-        self.assertEqual([(1, "Page 2")], [(index, entry.label) for index, entry in app.deleted_entries])
+        self.assertEqual([[(1, "Page 2")]], [[(index, entry.label) for index, entry in group] for group in app.deleted_entries])
         self.assertEqual(1, app.page_list.selection)
+
+    def test_quick_delete_first_records_one_undo_group(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2"), _entry("Page 3")])
+        app.page_list = _FakeListbox(selection=2)
+        app.status = _FakeStatus()
+        app.deleted_entries = []
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        with patch("epub_layout_gui.messagebox.askyesno", return_value=True):
+            app.quick_delete_first(2)
+
+        self.assertEqual(["Page 3"], [entry.label for entry in app.model.entries])
+        self.assertEqual([[(0, "Page 1"), (1, "Page 2")]], [[(index, entry.label) for index, entry in group] for group in app.deleted_entries])
+        self.assertEqual(0, app.page_list.selection)
+        self.assertEqual("Deleted first 2 pages.", app.status.value)
+
+    def test_recover_last_deleted_restores_grouped_delete(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        page_1 = _entry("Page 1")
+        page_2 = _entry("Page 2")
+        page_3 = _entry("Page 3")
+        app.model = _FakeDeleteModel([page_3])
+        app.deleted_entries = [[(0, page_1), (1, page_2)]]
+        app.page_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        app.recover_last_deleted()
+
+        self.assertEqual(["Page 1", "Page 2", "Page 3"], [entry.label for entry in app.model.entries])
+        self.assertEqual([], app.deleted_entries)
+        self.assertEqual(0, app.page_list.selection)
+        self.assertEqual("Recovered 2 pages.", app.status.value)
 
 
 if __name__ == "__main__":
