@@ -33,10 +33,13 @@ def convert_pdf_to_epub(
     epub_path: Path,
     overwrite: bool = False,
     title: str | None = None,
+    author: str | None = None,
+    language: str = "zh-Hant",
     apple_books: bool = False,
     blank_pages_before_cover: int = 0,
     blank_pages_after_cover: int = 0,
     pair_first_two_pages: bool = False,
+    cover_item_id: str | None = None,
 ) -> dict[str, int]:
     if epub_path.exists() and not overwrite:
         raise PdfImageError(f"Refusing to overwrite existing file: {epub_path}")
@@ -56,9 +59,12 @@ def convert_pdf_to_epub(
         epub_path,
         source_path=pdf_path,
         title=book_title,
+        author=author,
+        language=language,
         overwrite=True,
         apple_books=apple_books,
         pair_first_two_pages=pair_first_two_pages,
+        cover_item_id=cover_item_id,
         counts=counts,
     )
 
@@ -68,9 +74,12 @@ def write_epub_from_pages(
     epub_path: Path,
     source_path: Path,
     title: str,
+    author: str | None = None,
+    language: str = "zh-Hant",
     overwrite: bool = False,
     apple_books: bool = False,
     pair_first_two_pages: bool = False,
+    cover_item_id: str | None = None,
     counts: dict[str, int] | None = None,
 ) -> dict[str, int]:
     if epub_path.exists() and not overwrite:
@@ -83,7 +92,7 @@ def write_epub_from_pages(
         _write_deflated(
             archive,
             "EPUB/content.opf",
-            _content_opf(title, identifier, pages, apple_books, pair_first_two_pages),
+            _content_opf(title, identifier, pages, apple_books, pair_first_two_pages, author, language, cover_item_id),
         )
         _write_deflated(archive, "EPUB/nav.xhtml", _nav_xhtml(title, pages))
         _write_deflated(archive, "EPUB/styles/page.css", _page_css())
@@ -199,11 +208,17 @@ def _content_opf(
     pages: list[EpubPage],
     apple_books: bool = False,
     pair_first_two_pages: bool = False,
+    author: str | None = None,
+    language: str = "zh-Hant",
+    cover_item_id: str | None = None,
 ) -> str:
     title_xml = html.escape(title, quote=True)
+    language_xml = html.escape(language or "zh-Hant", quote=True)
+    creator_xml = html.escape(author, quote=True) if author else None
+    cover_id = cover_item_id or _first_image_item_id(pages)
     image_items = "\n".join(
         f'    <item id="img-{page.index:04d}" href="{page.image_href}" media-type="{page.image_media_type}"'
-        f'{" properties=\"cover-image\"" if page.index == 1 else ""}/>'
+        f'{" properties=\"cover-image\"" if page.item_id == cover_id else ""}/>'
         for page in pages
         if not page.is_blank
     )
@@ -225,7 +240,8 @@ def _content_opf(
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="bookid">{html.escape(identifier, quote=True)}</dc:identifier>
     <dc:title>{title_xml}</dc:title>
-    <dc:language>zh-Hant</dc:language>
+{f"    <dc:creator>{creator_xml}</dc:creator>" if creator_xml else ""}
+    <dc:language>{language_xml}</dc:language>
     <meta property="dcterms:modified">2026-05-17T00:00:00Z</meta>
     <meta property="rendition:layout">pre-paginated</meta>
     <meta property="rendition:orientation">auto</meta>
@@ -242,6 +258,13 @@ def _content_opf(
   </spine>
 </package>
 """
+
+
+def _first_image_item_id(pages: list[EpubPage]) -> str | None:
+    for page in pages:
+        if not page.is_blank:
+            return page.item_id
+    return None
 
 
 def _spine_itemref(page: EpubPage, pair_first_two_pages: bool) -> str:

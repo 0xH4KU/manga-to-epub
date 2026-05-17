@@ -5,7 +5,7 @@ import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 
-from pdf_to_cbz_lossless import ImageStream, image_to_archive_member, images_in_pdf_page_order
+from pdf_to_cbz_lossless import ImageStream, PdfImageError, image_to_archive_member, images_in_pdf_page_order
 from pdf_to_epub_lossless import EpubPage, _media_type_for_ext, write_epub_from_pages
 
 
@@ -21,11 +21,24 @@ class LayoutEntry:
 
 
 class LayoutModel:
-    def __init__(self, source_path: Path, entries: list[LayoutEntry], source_page_count: int | None = None):
+    def __init__(
+        self,
+        source_path: Path,
+        entries: list[LayoutEntry],
+        source_page_count: int | None = None,
+        title: str | None = None,
+        author: str | None = None,
+        language: str = "zh-Hant",
+        cover_source_index: int | None = None,
+    ):
         self.source_path = source_path
         self.entries = entries
         self._source_page_count = source_page_count or max((entry.source_index or 0 for entry in entries), default=0)
         self._blank_counter = sum(1 for entry in entries if entry.is_blank)
+        self.title = title or source_path.stem
+        self.author = author or ""
+        self.language = language or "zh-Hant"
+        self.cover_source_index = cover_source_index or self._first_image_source_index()
 
     @classmethod
     def from_pdf(cls, pdf_path: Path) -> "LayoutModel":
@@ -64,6 +77,7 @@ class LayoutModel:
         if index < 0 or index >= len(self.entries):
             raise IndexError("Deletion index out of range")
         del self.entries[index]
+        self._ensure_valid_cover()
 
     def delete_first(self, count: int) -> list[tuple[int, LayoutEntry]]:
         if count <= 0:
@@ -88,6 +102,7 @@ class LayoutModel:
         end = min(end, len(self.entries) - 1)
         deleted = [(index, self.entries[index]) for index in range(start, end + 1)]
         del self.entries[start : end + 1]
+        self._ensure_valid_cover()
         return deleted
 
     def normalized_pages(self) -> list[EpubPage]:
@@ -121,6 +136,20 @@ class LayoutModel:
             )
         return pages
 
+    def normalized_cover_item_id(self) -> str | None:
+        if self.cover_source_index is None:
+            return None
+        for entry, page in zip(self.entries, self.normalized_pages()):
+            if not entry.is_blank and entry.source_index == self.cover_source_index:
+                return page.item_id
+        return None
+
+    def set_cover(self, source_index: int) -> None:
+        entry = next((entry for entry in self.entries if entry.source_index == source_index), None)
+        if entry is None or entry.is_blank:
+            raise ValueError("Cover must be an image page in the current layout")
+        self.cover_source_index = source_index
+
     def save_preset(self, preset_path: Path) -> None:
         source_order = [entry.source_index for entry in self.entries if entry.source_index is not None]
         deleted_source_pages = sorted(set(range(1, self.source_page_count + 1)) - set(source_order))
@@ -146,13 +175,19 @@ class LayoutModel:
             self.insert_blank(index)
 
     def export_epub(self, epub_path: Path, overwrite: bool = False, title: str | None = None) -> dict[str, int]:
+        if not any(not entry.is_blank for entry in self.entries):
+            raise PdfImageError("Cannot export an EPUB without image pages")
+        self._ensure_valid_cover()
         counts = self._counts()
         return write_epub_from_pages(
             self.normalized_pages(),
             epub_path,
             source_path=self.source_path,
-            title=title or self.source_path.stem,
+            title=title or self.title,
+            author=self.author or None,
+            language=self.language,
             overwrite=overwrite,
+            cover_item_id=self.normalized_cover_item_id(),
             counts=counts,
         )
 
@@ -169,6 +204,20 @@ class LayoutModel:
     @property
     def source_page_count(self) -> int:
         return self._source_page_count
+
+    def _first_image_source_index(self) -> int | None:
+        for entry in self.entries:
+            if not entry.is_blank and entry.source_index is not None:
+                return entry.source_index
+        return None
+
+    def _ensure_valid_cover(self) -> None:
+        if self.cover_source_index is None:
+            self.cover_source_index = self._first_image_source_index()
+            return
+        if any(not entry.is_blank and entry.source_index == self.cover_source_index for entry in self.entries):
+            return
+        self.cover_source_index = self._first_image_source_index()
 
 
 def _entry_from_image(image: ImageStream, padding: int) -> LayoutEntry:

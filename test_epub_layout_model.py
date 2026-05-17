@@ -180,6 +180,38 @@ class EpubLayoutModelTests(unittest.TestCase):
                 self.assertNotIn('idref="page-0004"', opf)
                 self.assertIn("Page 4", nav)
 
+    def test_model_exports_metadata_and_source_cover_after_normalization(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            epub_path = Path(tmp) / "comic.epub"
+            pdf_path.write_bytes(_four_page_pdf())
+            model = LayoutModel.from_pdf(pdf_path)
+            model.title = "Volume & 1"
+            model.author = "Author <Name>"
+            model.language = "ja"
+            model.set_cover(2)
+            model.delete_first(1)
+
+            model.export_epub(epub_path, overwrite=True)
+
+            with ZipFile(epub_path) as archive:
+                opf = archive.read("EPUB/content.opf").decode("utf-8")
+                self.assertIn("<dc:title>Volume &amp; 1</dc:title>", opf)
+                self.assertIn("<dc:creator>Author &lt;Name&gt;</dc:creator>", opf)
+                self.assertIn("<dc:language>ja</dc:language>", opf)
+                self.assertIn('id="img-0001" href="images/page-0001.jpg" media-type="image/jpeg" properties="cover-image"', opf)
+
+    def test_cover_falls_back_when_selected_page_is_deleted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            pdf_path.write_bytes(_four_page_pdf())
+            model = LayoutModel.from_pdf(pdf_path)
+            model.set_cover(3)
+
+            model.delete_range(2, 2)
+
+            self.assertEqual(1, model.cover_source_index)
+
 
 if __name__ == "__main__":
     unittest.main()

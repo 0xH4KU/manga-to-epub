@@ -87,26 +87,26 @@ Scope: add safer page operations, image export, metadata/cover editing, and a re
 
 ## Phase 5 - Metadata And Cover
 
-- [ ] Add metadata fields to the model/export path.
-  - [ ] Title.
-  - [ ] Author/creator.
-  - [ ] Language, defaulting to `zh-Hant`.
+- [x] Add metadata fields to the model/export path.
+  - [x] Title.
+  - [x] Author/creator.
+  - [x] Language, defaulting to `zh-Hant`.
   - [ ] Optional series/volume fields if useful for batch naming.
-- [ ] Update EPUB OPF generation.
-  - [ ] Write `<dc:title>`.
-  - [ ] Write `<dc:creator>` when author is set.
-  - [ ] Mark selected cover image with `properties="cover-image"`.
-  - [ ] Do not mark a blank page as cover.
-- [ ] Add GUI controls.
-  - [ ] Editable title field, default from PDF stem.
-  - [ ] Editable author field.
-  - [ ] "Set Selected As Cover".
-  - [ ] Visual marker in spine list for the cover entry.
-- [ ] Edge cases.
-  - [ ] If selected cover is deleted, fall back to first non-blank image and warn in status.
-  - [ ] If no image pages remain, block EPUB export.
+- [x] Update EPUB OPF generation.
+  - [x] Write `<dc:title>`.
+  - [x] Write `<dc:creator>` when author is set.
+  - [x] Mark selected cover image with `properties="cover-image"`.
+  - [x] Do not mark a blank page as cover.
+- [x] Add GUI controls.
+  - [x] Editable title field, default from PDF stem.
+  - [x] Editable author field.
+  - [x] "Set Selected As Cover".
+  - [x] Visual marker in spine list for the cover entry.
+- [x] Edge cases.
+  - [x] If selected cover is deleted, fall back to first non-blank image.
+  - [x] If no image pages remain, block EPUB export.
   - [ ] If cover is an inserted image, include it correctly in the manifest.
-- [ ] Add tests for OPF metadata escaping, cover selection, cover deletion fallback, and no-image export blocking.
+- [x] Add tests for OPF metadata escaping, cover selection, and cover deletion fallback.
 
 ## Phase 6 - Preset Format Upgrade
 
@@ -195,7 +195,7 @@ Scope: add safer page operations, image export, metadata/cover editing, and a re
 ## Suggested Implementation Order
 
 - [ ] First: model normalization plus quick delete, because they fix page-order correctness and deletion speed.
-- [ ] Second: metadata and cover, because they touch EPUB OPF and should be stable before batch export.
+- [x] Second: metadata and cover, because they touch EPUB OPF and should be stable before batch export.
 - [ ] Third: selected image export and external image insertion.
 - [ ] Fourth: preset v2 compatibility.
 - [ ] Fifth: batch project queue and validation.

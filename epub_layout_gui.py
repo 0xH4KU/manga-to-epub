@@ -27,6 +27,9 @@ class EpubLayoutApp:
         self.deleted_entries: list[list[tuple[int, LayoutEntry]]] = []
         self.status = tk.StringVar(value="Open a PDF to begin.")
         self.apple_preview = tk.BooleanVar(value=True)
+        self.title_var = tk.StringVar(value="")
+        self.author_var = tk.StringVar(value="")
+        self.language_var = tk.StringVar(value="zh-Hant")
 
         self._build_ui()
         self.root.bind_all("<Command-z>", lambda _event: self.recover_last_deleted())
@@ -84,6 +87,15 @@ class EpubLayoutApp:
         ttk.Button(right, text="Delete Range...", command=self.ask_delete_range).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(right, text="Normalize Export Order", command=self.normalize_export_order).pack(fill=tk.X, pady=(8, 0))
         ttk.Separator(right).pack(fill=tk.X, pady=16)
+        ttk.Label(right, text="Metadata").pack(anchor=tk.W)
+        ttk.Label(right, text="Title").pack(anchor=tk.W, pady=(8, 0))
+        ttk.Entry(right, textvariable=self.title_var).pack(fill=tk.X)
+        ttk.Label(right, text="Author").pack(anchor=tk.W, pady=(8, 0))
+        ttk.Entry(right, textvariable=self.author_var).pack(fill=tk.X)
+        ttk.Label(right, text="Language").pack(anchor=tk.W, pady=(8, 0))
+        ttk.Entry(right, textvariable=self.language_var).pack(fill=tk.X)
+        ttk.Button(right, text="Set Selected As Cover", command=self.set_selected_as_cover).pack(fill=tk.X, pady=(8, 0))
+        ttk.Separator(right).pack(fill=tk.X, pady=16)
         ttk.Label(
             right,
             text=(
@@ -110,6 +122,7 @@ class EpubLayoutApp:
             self.model = LayoutModel.from_pdf(self.pdf_path)
             self.deleted_entries.clear()
             self.thumbnail_cache.clear()
+            self._load_metadata_fields()
             self.refresh_list()
             self.page_list.selection_clear(0, tk.END)
             if self.model.entries:
@@ -127,7 +140,8 @@ class EpubLayoutApp:
         self.page_list.delete(0, tk.END)
         for i, entry in enumerate(self.model.entries, start=1):
             marker = "[blank]" if entry.is_blank else "[page]"
-            self.page_list.insert(tk.END, f"{i:04d} {marker} {entry.label}")
+            cover = " [cover]" if self._is_cover_entry(entry) else ""
+            self.page_list.insert(tk.END, f"{i:04d} {marker}{cover} {entry.label}")
         if yview_start is not None:
             self.page_list.yview_moveto(yview_start)
 
@@ -244,6 +258,23 @@ class EpubLayoutApp:
             return
         self._delete_group(lambda: self.model.delete_range(start - 1, end - 1), f"Deleted pages {start}-{end}.")
 
+    def set_selected_as_cover(self) -> None:
+        if self.model is None:
+            return
+        index = self.selected_index()
+        if index is None:
+            return
+        entry = self.model.entries[index]
+        if entry.is_blank or entry.source_index is None:
+            messagebox.showerror("Set cover failed", "Cover must be an image page.")
+            return
+        try:
+            self.model.set_cover(entry.source_index)
+            self.refresh_list(preserve_yview=True)
+            self.status.set(f"Set {entry.label} as cover.")
+        except Exception as exc:
+            messagebox.showerror("Set cover failed", str(exc))
+
     def normalize_export_order(self) -> None:
         if self.model is None:
             return
@@ -283,6 +314,7 @@ class EpubLayoutApp:
     def export_epub(self) -> None:
         if self.model is None or self.pdf_path is None:
             return
+        self._store_metadata_fields()
         self.output_dir.mkdir(exist_ok=True)
         default = self.pdf_path.with_suffix(".epub").name
         filename = filedialog.asksaveasfilename(
@@ -310,6 +342,7 @@ class EpubLayoutApp:
     def save_preset(self) -> None:
         if self.model is None:
             return
+        self._store_metadata_fields()
         filename = filedialog.asksaveasfilename(
             title="Save Layout Preset",
             defaultextension=".json",
@@ -337,6 +370,7 @@ class EpubLayoutApp:
             return
         try:
             self.model.apply_preset(Path(filename))
+            self._load_metadata_fields()
             self.refresh_list()
             self.page_list.selection_clear(0, tk.END)
             if self.model.entries:
@@ -388,6 +422,25 @@ class EpubLayoutApp:
     def _batch_done(self, count: int, output_dir: Path) -> None:
         self.status.set(f"Batch exported {count} EPUB files.")
         messagebox.showinfo("Batch complete", f"Exported {count} EPUB files to:\n{output_dir}")
+
+    def _load_metadata_fields(self) -> None:
+        if self.model is None:
+            return
+        self.title_var.set(self.model.title)
+        self.author_var.set(self.model.author)
+        self.language_var.set(self.model.language)
+
+    def _store_metadata_fields(self) -> None:
+        if self.model is None:
+            return
+        self.model.title = self.title_var.get().strip() or self.model.source_path.stem
+        self.model.author = self.author_var.get().strip()
+        self.model.language = self.language_var.get().strip() or "zh-Hant"
+
+    def _is_cover_entry(self, entry: LayoutEntry) -> bool:
+        if self.model is None:
+            return False
+        return not entry.is_blank and entry.source_index == getattr(self.model, "cover_source_index", None)
 
     def _export_done(self, epub_path: Path, counts: dict[str, int]) -> None:
         self.status.set(f"Exported {epub_path.name}: {counts['total']} spine items.")

@@ -67,6 +67,7 @@ class _FakeDeleteModel:
     def __init__(self, entries):
         self.entries = entries
         self.deleted = []
+        self.cover_source_index = 1
 
     def delete_entry(self, index):
         self.deleted.append(index)
@@ -90,9 +91,13 @@ class _FakeDeleteModel:
         del self.entries[start : end + 1]
         return deleted
 
+    def set_cover(self, source_index):
+        self.cover_source_index = source_index
+
 
 def _entry(label, is_blank=False):
-    return SimpleNamespace(label=label, is_blank=is_blank)
+    source_index = None if is_blank else int(label.split()[-1])
+    return SimpleNamespace(label=label, is_blank=is_blank, source_index=source_index)
 
 
 def _app_for_preview(entries, selected):
@@ -158,6 +163,16 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.refresh_list(preserve_yview=True)
 
         self.assertEqual(0.5, app.page_list.moved_to)
+
+    def test_refresh_list_marks_cover_entry(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2")])
+        app.model.cover_source_index = 2
+        app.page_list = _FakeListbox(yview=(0.5, 0.8))
+
+        app.refresh_list()
+
+        self.assertEqual("0002 [page] [cover] Page 2", app.page_list.items[1])
 
     def test_delete_selected_entry_uses_common_delete_for_blank(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
@@ -268,6 +283,19 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual([], app.deleted_entries)
         self.assertEqual(0, app.page_list.selection)
         self.assertEqual("Recovered 2 pages.", app.status.value)
+
+    def test_set_selected_as_cover_updates_model_and_status(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2")])
+        app.page_list = _FakeListbox(selection=1)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+
+        app.set_selected_as_cover()
+
+        self.assertEqual(2, app.model.cover_source_index)
+        self.assertTrue(app.preserved_yview)
+        self.assertEqual("Set Page 2 as cover.", app.status.value)
 
 
 if __name__ == "__main__":

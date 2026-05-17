@@ -117,6 +117,29 @@ class PdfToEpubLosslessTests(unittest.TestCase):
                 self.assertIn('<itemref idref="page-0001" properties="rendition:page-spread-right"/>', opf)
                 self.assertIn('<itemref idref="page-0002" properties="rendition:page-spread-left"/>', opf)
 
+    def test_epub_writes_author_language_and_selected_cover(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            epub_path = Path(tmp) / "comic.epub"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+
+            convert_pdf_to_epub(
+                pdf_path,
+                epub_path,
+                title="Comic & More",
+                author="A&B Studio",
+                language="ja",
+                cover_item_id="page-0002",
+            )
+
+            with ZipFile(epub_path) as archive:
+                opf = archive.read("EPUB/content.opf").decode("utf-8")
+                self.assertIn("<dc:title>Comic &amp; More</dc:title>", opf)
+                self.assertIn("<dc:creator>A&amp;B Studio</dc:creator>", opf)
+                self.assertIn("<dc:language>ja</dc:language>", opf)
+                self.assertNotIn('id="img-0001" href="images/page-0001.jpg" media-type="image/jpeg" properties="cover-image"', opf)
+                self.assertIn('id="img-0002" href="images/page-0002.jpg" media-type="image/jpeg" properties="cover-image"', opf)
+
 
 if __name__ == "__main__":
     unittest.main()
