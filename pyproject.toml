@@ -1,0 +1,26 @@
+[project]
+name = "manga-pdf-to-epub"
+version = "0.1.0"
+description = "Lossless PDF to EPUB/CBZ tools for Apple Books manga layout tuning."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "PyMuPDF>=1.24",
+]
+
+[project.scripts]
+pdf-to-epub-lossless = "pdf_to_epub_lossless:main"
+pdf-to-cbz-lossless = "pdf_to_cbz_lossless:main"
+epub-layout-gui = "epub_layout_gui:main"
+
+[tool.setuptools]
+py-modules = [
+  "pdf_to_cbz_lossless",
+  "pdf_to_epub_lossless",
+  "epub_layout_model",
+  "epub_layout_gui",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
