@@ -14,7 +14,13 @@ This tool focuses on the boring-but-crucial details:
 - Export EPUB 3 fixed-layout books for right-to-left manga reading.
 - Preview Apple Books' cover-side virtual blank page.
 - Insert or remove real blank pages at arbitrary positions.
+- Quick-delete the first N, last N, or a spine-position range.
+- Normalize exported EPUB internals so spine order, XHTML names, image names, and item IDs stay sequential after edits.
+- Set EPUB title, author, language, and cover image from the GUI.
+- Insert external JPEG/PNG pages into the EPUB spine.
+- Export selected spine images losslessly to a folder.
 - Save a layout preset and batch-apply it to a volume set.
+- Build a batch project queue from the current layout template and export ready PDFs together.
 - Recover deleted pages during layout editing.
 
 ## Features
@@ -54,11 +60,27 @@ Typical Apple Books manga workflow:
 2. Keep `Apple Books-like cover-right gap` enabled.
 3. Inspect spreads in the preview.
 4. Insert blank pages where needed to realign double-page artwork.
-5. Delete unwanted pages if necessary.
-6. Use `Recover Last Deleted` or `Cmd+Z` if a page was removed by mistake.
-7. Save a preset after one volume is correct.
-8. Batch-apply the preset to the rest of the set when the books share the same page structure.
+5. Delete unwanted pages if necessary. Use single-page delete, `Delete First...`, `Delete Last...`, or `Delete Range...`; quick delete numbers refer to the current left-side spine positions.
+6. Use `Recover Last Deleted` or `Cmd+Z` if a page or range was removed by mistake.
+7. Edit title, author, and language, then select an image page and use `Set Selected As Cover` when the first image should not be the cover.
+8. Insert external JPEG/PNG pages if needed, or select spine entries and use `Export Selected Images...` to extract their image bytes.
 9. Export EPUB and import it into Apple Books for final checking.
+
+The GUI normalizes EPUB internals during export. For example, if source pages 1-3 are deleted and the visible list starts with source `Page 4`, the exported EPUB still uses sequential names such as `page-0001.xhtml` and `images/page-0001.jpg`. The visible source labels remain unchanged so you can trace edits back to the original PDF.
+
+## Batch Project Workflow
+
+For a volume set that shares the same correction pattern:
+
+1. Open one representative PDF.
+2. Make the layout edits, metadata defaults, and cover choice.
+3. Click `Use Current Layout As Template`.
+4. Click `Add PDFs...` and choose the remaining volumes.
+5. Click `Validate Batch...` and choose an output directory.
+6. Review the batch queue. Matching PDFs are marked `Ready`; page-count mismatches are marked `Warning`; corrupt or unsupported PDFs are marked `Failed`.
+7. Click `Export Ready...` to export only ready items. A failed item does not stop the rest of the queue.
+
+The older `Save Preset`, `Load Preset`, and `Batch Apply` buttons remain available for simple preset-file workflows.
 
 ## Command Line
 
@@ -106,14 +128,15 @@ For Flate-compressed PDF image streams, the tool wraps the image data into PNG. 
 
 - `pdf_to_epub_lossless.py` - fixed-layout EPUB exporter.
 - `pdf_to_cbz_lossless.py` - CBZ exporter and low-level PDF image extraction.
-- `epub_layout_model.py` - editable spine model, blank pages, presets, export glue.
+- `epub_layout_model.py` - editable spine model, blank pages, image insertion, metadata, presets, export glue.
+- `epub_batch_model.py` - batch project queue, validation, and export orchestration.
 - `epub_layout_gui.py` - Apple Books-oriented layout GUI.
 - `test_*.py` - unit tests for conversion, layout, and preview behavior.
 
 ## Test
 
 ```bash
-.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_model.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py
+.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_model.py epub_batch_model.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py
 .venv/bin/python -m unittest
 ```
 
