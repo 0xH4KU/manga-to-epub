@@ -51,7 +51,7 @@ class EpubLayoutApp:
         left = ttk.Frame(main, padding=8)
         main.add(left, weight=1)
         ttk.Label(left, text="Spine order").pack(anchor=tk.W)
-        self.page_list = tk.Listbox(left, exportselection=False, activestyle="dotbox")
+        self.page_list = tk.Listbox(left, exportselection=False, activestyle="dotbox", selectmode=tk.EXTENDED)
         self.page_list.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
         self.page_list.bind("<<ListboxSelect>>", lambda _event: self.refresh_preview())
 
@@ -75,6 +75,8 @@ class EpubLayoutApp:
         ttk.Label(right, text="Blank pages").pack(anchor=tk.W)
         ttk.Button(right, text="Insert Blank Before", command=lambda: self.insert_blank(before=True)).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(right, text="Insert Blank After", command=lambda: self.insert_blank(before=False)).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Insert Image Before", command=lambda: self.insert_image(before=True)).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Insert Image After", command=lambda: self.insert_image(before=False)).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(right, text="Delete Selected Page", command=self.delete_selected_entry).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(right, text="Recover Last Deleted", command=self.recover_last_deleted).pack(fill=tk.X, pady=(8, 0))
         ttk.Separator(right).pack(fill=tk.X, pady=16)
@@ -95,6 +97,7 @@ class EpubLayoutApp:
         ttk.Label(right, text="Language").pack(anchor=tk.W, pady=(8, 0))
         ttk.Entry(right, textvariable=self.language_var).pack(fill=tk.X)
         ttk.Button(right, text="Set Selected As Cover", command=self.set_selected_as_cover).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Export Selected Images...", command=self.export_selected_images).pack(fill=tk.X, pady=(8, 0))
         ttk.Separator(right).pack(fill=tk.X, pady=16)
         ttk.Label(
             right,
@@ -149,6 +152,9 @@ class EpubLayoutApp:
         selection = self.page_list.curselection()
         return selection[0] if selection else None
 
+    def selected_indexes(self) -> list[int]:
+        return list(self.page_list.curselection())
+
     def insert_blank(self, before: bool) -> None:
         if self.model is None:
             return
@@ -165,6 +171,30 @@ class EpubLayoutApp:
             self.status.set(f"Inserted blank page at position {index + 1}.")
         except Exception as exc:
             messagebox.showerror("Insert blank failed", str(exc))
+
+    def insert_image(self, before: bool) -> None:
+        if self.model is None:
+            return
+        filename = filedialog.askopenfilename(
+            title="Insert Image",
+            filetypes=[("Image files", "*.jpg *.jpeg *.png"), ("All files", "*.*")],
+            initialdir=str(Path.cwd()),
+        )
+        if not filename:
+            return
+        selected = self.selected_index()
+        index = selected if selected is not None else len(self.model.entries)
+        if not before:
+            index += 1
+        try:
+            self.model.insert_image(index, Path(filename))
+            self.refresh_list(preserve_yview=True)
+            self.page_list.selection_clear(0, tk.END)
+            self.page_list.selection_set(index)
+            self.refresh_preview()
+            self.status.set(f"Inserted image: {Path(filename).name}")
+        except Exception as exc:
+            messagebox.showerror("Insert image failed", str(exc))
 
     def delete_selected_entry(self) -> None:
         if self.model is None:
@@ -274,6 +304,23 @@ class EpubLayoutApp:
             self.status.set(f"Set {entry.label} as cover.")
         except Exception as exc:
             messagebox.showerror("Set cover failed", str(exc))
+
+    def export_selected_images(self) -> None:
+        if self.model is None:
+            return
+        indexes = self.selected_indexes()
+        if not indexes:
+            return
+        output_dir_name = filedialog.askdirectory(title="Export selected images", initialdir=str(Path.cwd()))
+        if not output_dir_name:
+            return
+        try:
+            exported, skipped = self.model.export_selected_images(indexes, Path(output_dir_name))
+            self.status.set(f"Exported {len(exported)} images; skipped {skipped} blank pages.")
+            if not exported:
+                messagebox.showinfo("Export selected images", "No exportable images selected.")
+        except Exception as exc:
+            messagebox.showerror("Export selected images failed", str(exc))
 
     def normalize_export_order(self) -> None:
         if self.model is None:
@@ -506,7 +553,10 @@ class EpubLayoutApp:
             fill = "#a0a0a0" if isinstance(entry, _VirtualBlank) else "#606060"
             self.preview.create_text(x + max_w // 2, y + max_h // 2, text=entry.label, fill=fill)
             return
-        photo = self._thumbnail_for_page(entry.page.index, max_w, max_h)
+        if getattr(entry, "source_index", None) is None:
+            photo = self._thumbnail_for_entry(entry, max_w, max_h)
+        else:
+            photo = self._thumbnail_for_page(entry.page.index, max_w, max_h)
         if photo is None:
             self.preview.create_text(x + max_w // 2, y + max_h // 2, text=entry.label, fill="#202020")
             return
@@ -531,6 +581,21 @@ class EpubLayoutApp:
                 image = tk.PhotoImage(data=pix.tobytes("png"))
                 self.thumbnail_cache[cache_key] = image
                 return image
+        except Exception:
+            return None
+
+    def _thumbnail_for_entry(self, entry, max_w: int, max_h: int) -> tk.PhotoImage | None:
+        cache_key = (id(entry), max_w, max_h)
+        cached = self.thumbnail_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            image = tk.PhotoImage(data=entry.page.image_data)
+            scale = max(1, int(max(image.width() / max_w, image.height() / max_h, 1)))
+            if scale > 1:
+                image = image.subsample(scale, scale)
+            self.thumbnail_cache[cache_key] = image
+            return image
         except Exception:
             return None
 

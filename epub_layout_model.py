@@ -5,6 +5,8 @@ import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 
+import fitz
+
 from pdf_to_cbz_lossless import ImageStream, PdfImageError, image_to_archive_member, images_in_pdf_page_order
 from pdf_to_epub_lossless import EpubPage, _media_type_for_ext, write_epub_from_pages
 
@@ -65,6 +67,32 @@ class LayoutModel:
             is_blank=True,
         )
         self.entries.insert(index, LayoutEntry(page.label, page))
+
+    def insert_image(self, index: int, image_path: Path) -> None:
+        if index < 0 or index > len(self.entries):
+            raise IndexError("Image insertion index out of range")
+        image_path = Path(image_path)
+        ext = image_path.suffix.lower().lstrip(".")
+        if ext == "jpeg":
+            ext = "jpg"
+        if ext not in {"jpg", "png"}:
+            raise ValueError("Only JPEG and PNG images can be inserted")
+        data = image_path.read_bytes()
+        width, height = _image_dimensions(image_path)
+        item_number = self._next_external_image_number()
+        item_id = f"inserted-{item_number:04d}"
+        page = EpubPage(
+            index=item_number,
+            width=width,
+            height=height,
+            image_href=f"images/{item_id}.{ext}",
+            image_media_type=_media_type_for_ext(ext),
+            image_data=data,
+            xhtml_href=f"xhtml/{item_id}.xhtml",
+            item_id=item_id,
+            label=image_path.stem,
+        )
+        self.entries.insert(index, LayoutEntry(image_path.stem, page))
 
     def delete_blank(self, index: int) -> None:
         if index < 0 or index >= len(self.entries):
@@ -135,6 +163,25 @@ class LayoutModel:
                 )
             )
         return pages
+
+    def export_selected_images(self, indexes: list[int], output_dir: Path) -> tuple[list[Path], int]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        padding = max(4, len(str(len(self.entries))))
+        exported: list[Path] = []
+        skipped = 0
+        for index in indexes:
+            if index < 0 or index >= len(self.entries):
+                continue
+            entry = self.entries[index]
+            if entry.is_blank:
+                skipped += 1
+                continue
+            ext = Path(entry.page.image_href or "").suffix.lower().lstrip(".")
+            filename = f"{index + 1:0{padding}d}.{ext}"
+            destination = _unique_path(output_dir / filename)
+            destination.write_bytes(entry.page.image_data or b"")
+            exported.append(destination)
+        return exported, skipped
 
     def normalized_cover_item_id(self) -> str | None:
         if self.cover_source_index is None:
@@ -219,6 +266,10 @@ class LayoutModel:
             return
         self.cover_source_index = self._first_image_source_index()
 
+    def _next_external_image_number(self) -> int:
+        inserted = [entry.page.item_id for entry in self.entries if entry.source_index is None and not entry.is_blank]
+        return len(inserted) + 1
+
 
 def _entry_from_image(image: ImageStream, padding: int) -> LayoutEntry:
     ext, payload = _image_payload(image)
@@ -251,3 +302,22 @@ def _reference_page(entries: list[LayoutEntry], index: int) -> EpubPage:
         if not candidate.is_blank:
             return candidate.page
     raise ValueError("Cannot insert blank page into an empty layout")
+
+
+def _image_dimensions(image_path: Path) -> tuple[int, int]:
+    try:
+        with fitz.open(image_path) as doc:
+            page = doc[0]
+            return int(page.rect.width), int(page.rect.height)
+    except Exception as exc:
+        raise ValueError(f"Cannot read image dimensions: {image_path}") from exc
+
+
+def _unique_path(path: Path) -> Path:
+    if not path.exists():
+        return path
+    for counter in range(1, 10000):
+        candidate = path.with_name(f"{path.stem}-{counter}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+    raise ValueError(f"Cannot find available filename for {path}")

@@ -94,6 +94,12 @@ class _FakeDeleteModel:
     def set_cover(self, source_index):
         self.cover_source_index = source_index
 
+    def insert_image(self, index, image_path):
+        self.entries.insert(index, _entry(f"Image {index + 1}"))
+
+    def export_selected_images(self, indexes, output_dir):
+        return [output_dir / f"{index + 1:04d}.jpg" for index in indexes], 0
+
 
 def _entry(label, is_blank=False):
     source_index = None if is_blank else int(label.split()[-1])
@@ -296,6 +302,28 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual(2, app.model.cover_source_index)
         self.assertTrue(app.preserved_yview)
         self.assertEqual("Set Page 2 as cover.", app.status.value)
+
+    def test_selected_indexes_support_multi_selection(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.page_list = _FakeListbox(selection=None)
+        app.page_list.curselection = lambda: (0, 2)
+
+        self.assertEqual([0, 2], app.selected_indexes())
+
+    def test_insert_image_after_selected_page_calls_model(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1")])
+        app.page_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        with patch("epub_layout_gui.filedialog.askopenfilename", return_value="/tmp/extra.png"):
+            app.insert_image(before=False)
+
+        self.assertEqual(["Page 1", "Image 2"], [entry.label for entry in app.model.entries])
+        self.assertTrue(app.preserved_yview)
+        self.assertEqual("Inserted image: extra.png", app.status.value)
 
 
 if __name__ == "__main__":

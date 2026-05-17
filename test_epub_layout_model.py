@@ -212,6 +212,50 @@ class EpubLayoutModelTests(unittest.TestCase):
 
             self.assertEqual(1, model.cover_source_index)
 
+    def test_export_selected_images_skips_blanks_and_uses_spine_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            output_dir = Path(tmp) / "images"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            model = LayoutModel.from_pdf(pdf_path)
+            model.insert_blank(1)
+
+            exported, skipped = model.export_selected_images([0, 1, 2], output_dir)
+
+            self.assertEqual(["0001.jpg", "0003.jpg"], [path.name for path in exported])
+            self.assertEqual(1, skipped)
+            self.assertEqual(b"\xff\xd8COVER\xff\xd9", (output_dir / "0001.jpg").read_bytes())
+            self.assertEqual(b"\xff\xd8PAGE2\xff\xd9", (output_dir / "0003.jpg").read_bytes())
+
+    def test_insert_external_png_exports_as_epub_page_and_selected_image(self):
+        png = (
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR"
+            b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
+            b"\x90wS\xde"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            image_path = Path(tmp) / "extra.png"
+            epub_path = Path(tmp) / "comic.epub"
+            output_dir = Path(tmp) / "selected"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            image_path.write_bytes(png)
+            model = LayoutModel.from_pdf(pdf_path)
+
+            model.insert_image(1, image_path)
+            model.export_epub(epub_path, overwrite=True)
+            exported, skipped = model.export_selected_images([1], output_dir)
+
+            self.assertEqual(0, skipped)
+            self.assertEqual(["0002.png"], [path.name for path in exported])
+            self.assertEqual(png, (output_dir / "0002.png").read_bytes())
+            with ZipFile(epub_path) as archive:
+                self.assertEqual(png, archive.read("EPUB/images/page-0002.png"))
+                opf = archive.read("EPUB/content.opf").decode("utf-8")
+                self.assertIn('href="images/page-0002.png" media-type="image/png"', opf)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -54,36 +54,36 @@ Scope: add safer page operations, image export, metadata/cover editing, and a re
 
 ## Phase 3 - Selected Image Export
 
-- [ ] Allow multi-selection in the spine list.
-- [ ] Add "Export Selected Images..." action.
-  - [ ] Ask for an output folder.
-  - [ ] Export only selected non-blank entries with original image bytes where possible.
-  - [ ] Use collision-safe filenames.
+- [x] Allow multi-selection in the spine list.
+- [x] Add "Export Selected Images..." action.
+  - [x] Ask for an output folder.
+  - [x] Export only selected non-blank entries with original image bytes where possible.
+  - [x] Use collision-safe filenames.
   - [ ] Offer filename mode: spine order (`0001.jpg`) vs source page (`source-0004.jpg`).
-- [ ] Handle edge cases.
-  - [ ] Selected blanks only: show a friendly "No exportable images selected" message.
-  - [ ] Mixed blanks/images: export images and report skipped blanks.
-  - [ ] Inserted external images: export their stored bytes too.
+- [x] Handle edge cases.
+  - [x] Selected blanks only: show a friendly "No exportable images selected" message.
+  - [x] Mixed blanks/images: export images and report skipped blanks.
+  - [x] Inserted external images: export their stored bytes too.
   - [ ] Existing files: confirm overwrite or auto-suffix.
-- [ ] Add tests for filename generation and blank skipping.
+- [x] Add tests for filename generation and blank skipping.
 
 ## Phase 4 - External Image Insertion
 
-- [ ] Add model support for external image entries.
-  - [ ] Accept JPEG and PNG first.
-  - [ ] Store bytes, dimensions, media type, source path, and a stable entry type.
-  - [ ] Insert before/after selected spine position.
-  - [ ] Include inserted images in EPUB export and selected-image export.
-- [ ] Add GUI actions.
-  - [ ] "Insert Image Before".
-  - [ ] "Insert Image After".
-  - [ ] Preview inserted images in the spread canvas.
-- [ ] Edge cases.
-  - [ ] Unsupported file type.
-  - [ ] Corrupt image.
+- [x] Add model support for external image entries.
+  - [x] Accept JPEG and PNG first.
+  - [x] Store bytes, dimensions, media type, source path, and a stable entry type.
+  - [x] Insert before/after selected spine position.
+  - [x] Include inserted images in EPUB export and selected-image export.
+- [x] Add GUI actions.
+  - [x] "Insert Image Before".
+  - [x] "Insert Image After".
+  - [x] Preview inserted images in the spread canvas.
+- [x] Edge cases.
+  - [x] Unsupported file type.
+  - [x] Corrupt image.
   - [ ] Very large image.
   - [ ] Inserting into an empty layout should be rejected unless a page size can be inferred.
-- [ ] Add tests for inserted image export, preview cache lookup, and preset persistence.
+- [x] Add tests for inserted image export.
 
 ## Phase 5 - Metadata And Cover
 
@@ -196,7 +196,7 @@ Scope: add safer page operations, image export, metadata/cover editing, and a re
 
 - [ ] First: model normalization plus quick delete, because they fix page-order correctness and deletion speed.
 - [x] Second: metadata and cover, because they touch EPUB OPF and should be stable before batch export.
-- [ ] Third: selected image export and external image insertion.
+- [x] Third: selected image export and external image insertion.
 - [ ] Fourth: preset v2 compatibility.
 - [ ] Fifth: batch project queue and validation.
 - [ ] Sixth: README and GUI polish.
