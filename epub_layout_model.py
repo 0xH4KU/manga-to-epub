@@ -16,6 +16,7 @@ class LayoutEntry:
     label: str
     page: EpubPage
     source_index: int | None = None
+    inserted_path: Path | None = None
 
     @property
     def is_blank(self) -> bool:
@@ -56,6 +57,9 @@ class LayoutModel:
         if index < 0 or index > len(self.entries):
             raise IndexError("Blank insertion index out of range")
         reference = _reference_page(self.entries, index)
+        self._insert_blank_from_reference(index, reference)
+
+    def _insert_blank_from_reference(self, index: int, reference: EpubPage) -> None:
         self._blank_counter += 1
         blank_id = f"blank-{self._blank_counter:04d}"
         page = EpubPage(
@@ -96,7 +100,7 @@ class LayoutModel:
             item_id=item_id,
             label=image_path.stem,
         )
-        self.entries.insert(index, LayoutEntry(image_path.stem, page))
+        self.entries.insert(index, LayoutEntry(image_path.stem, page, inserted_path=image_path))
 
     def delete_blank(self, index: int) -> None:
         if index < 0 or index >= len(self.entries):
@@ -212,21 +216,35 @@ class LayoutModel:
         self.cover_entry_id = entry.page.item_id
 
     def save_preset(self, preset_path: Path) -> None:
-        source_order = [entry.source_index for entry in self.entries if entry.source_index is not None]
-        deleted_source_pages = sorted(set(range(1, self.source_page_count + 1)) - set(source_order))
-        blank_positions = [index for index, entry in enumerate(self.entries) if entry.is_blank]
         payload = {
-            "version": 1,
+            "version": 2,
             "source_page_count": self.source_page_count,
-            "blank_positions": blank_positions,
-            "deleted_source_pages": deleted_source_pages,
+            "metadata": {
+                "title": self.title,
+                "author": self.author,
+                "language": self.language,
+                "exclude_cover_from_reading": self.exclude_cover_from_reading,
+            },
+            "cover": self._preset_cover_payload(),
+            "entries": [self._preset_entry_payload(entry) for entry in self.entries],
         }
         preset_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
     def apply_preset(self, preset_path: Path) -> None:
         payload = json.loads(preset_path.read_text(encoding="utf-8"))
-        if payload.get("version") != 1:
-            raise ValueError("Unsupported preset version")
+        self.apply_preset_payload(payload)
+
+    def apply_preset_payload(self, payload: dict) -> None:
+        version = payload.get("version")
+        if version == 1:
+            self._apply_v1_preset(payload)
+            return
+        if version == 2:
+            self._apply_v2_preset(payload)
+            return
+        raise ValueError("Unsupported preset version")
+
+    def _apply_v1_preset(self, payload: dict) -> None:
         deleted = set(payload.get("deleted_source_pages", []))
         source_entries = [entry for entry in self.entries if entry.source_index not in deleted]
         self.entries = source_entries
@@ -234,6 +252,54 @@ class LayoutModel:
         for position in payload.get("blank_positions", []):
             index = min(max(int(position), 0), len(self.entries))
             self.insert_blank(index)
+        self._ensure_valid_cover()
+
+    def _apply_v2_preset(self, payload: dict) -> None:
+        source_entries = {entry.source_index: entry for entry in self.entries if entry.source_index is not None}
+        original_entries = list(self.entries)
+        self.entries = []
+        self._blank_counter = 0
+        for item in payload.get("entries", []):
+            kind = item.get("kind")
+            if kind == "source":
+                source_index = item.get("source_index")
+                entry = source_entries.get(source_index)
+                if entry is not None:
+                    self.entries.append(entry)
+                continue
+            if kind == "blank":
+                if self.entries:
+                    self.insert_blank(len(self.entries))
+                else:
+                    self._insert_blank_from_reference(0, _reference_page(original_entries, 0))
+                continue
+            if kind == "inserted":
+                image_path = Path(item.get("path", ""))
+                if not image_path.exists():
+                    raise ValueError(f"Inserted image not found: {image_path}")
+                self.insert_image(len(self.entries), image_path)
+                continue
+            raise ValueError(f"Unsupported preset entry kind: {kind}")
+
+        metadata = payload.get("metadata", {})
+        self.title = metadata.get("title") or self.source_path.stem
+        self.author = metadata.get("author") or ""
+        self.language = metadata.get("language") or "zh-Hant"
+        self.exclude_cover_from_reading = bool(metadata.get("exclude_cover_from_reading", False))
+
+        self.cover_source_index = None
+        self.cover_entry_id = None
+        cover = payload.get("cover", {})
+        if cover.get("kind") == "source" and cover.get("source_index") is not None:
+            try:
+                self.set_cover(int(cover["source_index"]))
+            except ValueError:
+                self._ensure_valid_cover()
+        elif cover.get("kind") == "inserted" and cover.get("entry_id") is not None:
+            self.cover_entry_id = str(cover["entry_id"])
+            self._ensure_valid_cover()
+        else:
+            self._ensure_valid_cover()
 
     def export_epub(self, epub_path: Path, overwrite: bool = False, title: str | None = None) -> dict[str, int]:
         if not any(not entry.is_blank for entry in self.entries):
@@ -285,6 +351,22 @@ class LayoutModel:
     def _next_external_image_number(self) -> int:
         inserted = [entry.page.item_id for entry in self.entries if entry.source_index is None and not entry.is_blank]
         return len(inserted) + 1
+
+    def _preset_entry_payload(self, entry: LayoutEntry) -> dict:
+        if entry.is_blank:
+            return {"kind": "blank"}
+        if entry.source_index is not None:
+            return {"kind": "source", "source_index": entry.source_index}
+        if entry.inserted_path is None:
+            raise ValueError(f"Inserted image entry is missing source path: {entry.label}")
+        return {"kind": "inserted", "path": str(entry.inserted_path)}
+
+    def _preset_cover_payload(self) -> dict:
+        if self.cover_entry_id is not None:
+            return {"kind": "inserted", "source_index": None, "entry_id": self.cover_entry_id}
+        if self.cover_source_index is not None:
+            return {"kind": "source", "source_index": self.cover_source_index, "entry_id": None}
+        return {"kind": "first-image", "source_index": None, "entry_id": None}
 
 
 def _entry_from_image(image: ImageStream, padding: int) -> LayoutEntry:

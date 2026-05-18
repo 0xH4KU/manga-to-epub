@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import json
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -126,6 +127,8 @@ class EpubLayoutModelTests(unittest.TestCase):
                 ["Blank 1", "Page 1", "Blank 2", "Page 2"],
                 [entry.label for entry in applied.entries],
             )
+            payload = json.loads(preset_path.read_text(encoding="utf-8"))
+            self.assertEqual(2, payload["version"])
 
     def test_preset_preserves_deleted_source_pages(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -143,6 +146,104 @@ class EpubLayoutModelTests(unittest.TestCase):
             applied.apply_preset(preset_path)
 
             self.assertEqual(["Page 1", "Blank 1"], [entry.label for entry in applied.entries])
+
+    def test_version_1_preset_still_loads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            preset_path = Path(tmp) / "layout-v1.json"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            preset_path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "source_page_count": 2,
+                        "blank_positions": [0, 2],
+                        "deleted_source_pages": [2],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            model = LayoutModel.from_pdf(pdf_path)
+
+            model.apply_preset(preset_path)
+
+            self.assertEqual(["Blank 1", "Page 1", "Blank 2"], [entry.label for entry in model.entries])
+
+    def test_version_2_preset_round_trip_preserves_layout_metadata_and_inserted_cover(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            other_pdf_path = Path(tmp) / "other.pdf"
+            image_path = Path(tmp) / "cover.png"
+            preset_path = Path(tmp) / "layout-v2.json"
+            pdf_path.write_bytes(_four_page_pdf())
+            other_pdf_path.write_bytes(_four_page_pdf())
+            image_path.write_bytes(_tiny_png())
+            model = LayoutModel.from_pdf(pdf_path)
+            model.title = "Preset Title"
+            model.author = "Preset Author"
+            model.language = "ja"
+            model.exclude_cover_from_reading = True
+            model.delete_range(1, 1)
+            model.insert_blank(1)
+            model.insert_image(2, image_path)
+            model.set_cover_entry(model.entries[2])
+
+            model.save_preset(preset_path)
+            payload = json.loads(preset_path.read_text(encoding="utf-8"))
+            applied = LayoutModel.from_pdf(other_pdf_path)
+            applied.apply_preset(preset_path)
+
+            self.assertEqual(2, payload["version"])
+            self.assertEqual(
+                [
+                    {"kind": "source", "source_index": 1},
+                    {"kind": "blank"},
+                    {"kind": "inserted", "path": str(image_path)},
+                    {"kind": "source", "source_index": 3},
+                    {"kind": "source", "source_index": 4},
+                ],
+                payload["entries"],
+            )
+            self.assertEqual(
+                ["Page 1", "Blank 1", "cover", "Page 3", "Page 4"],
+                [entry.label for entry in applied.entries],
+            )
+            self.assertEqual("Preset Title", applied.title)
+            self.assertEqual("Preset Author", applied.author)
+            self.assertEqual("ja", applied.language)
+            self.assertTrue(applied.exclude_cover_from_reading)
+            self.assertEqual("inserted-0001", applied.cover_entry_id)
+
+    def test_version_2_preset_missing_inserted_image_raises_clear_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            preset_path = Path(tmp) / "layout-v2.json"
+            missing_path = Path(tmp) / "missing.png"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            preset_path.write_text(
+                json.dumps(
+                    {
+                        "version": 2,
+                        "source_page_count": 2,
+                        "metadata": {
+                            "title": "Comic",
+                            "author": "",
+                            "language": "zh-Hant",
+                            "exclude_cover_from_reading": False,
+                        },
+                        "cover": {"kind": "first-image", "source_index": None, "entry_id": None},
+                        "entries": [
+                            {"kind": "source", "source_index": 1},
+                            {"kind": "inserted", "path": str(missing_path)},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            model = LayoutModel.from_pdf(pdf_path)
+
+            with self.assertRaisesRegex(ValueError, "Inserted image not found"):
+                model.apply_preset(preset_path)
 
     def test_delete_range_returns_entries_for_grouped_undo(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from epub_batch_model import BatchProject
 from epub_layout_model import LayoutModel
-from test_epub_layout_model import _four_page_pdf
+from test_epub_layout_model import _four_page_pdf, _tiny_png
 from test_pdf_to_cbz_lossless import _two_page_pdf_with_late_cover
 
 
@@ -60,6 +60,35 @@ class EpubBatchModelTests(unittest.TestCase):
             self.assertEqual("Exported", good.status)
             self.assertEqual("Failed", bad.status)
             self.assertTrue((output_dir / "good.epub").exists())
+
+    def test_template_model_for_item_preserves_inserted_cover_and_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sample_pdf = Path(tmp) / "sample.pdf"
+            target_pdf = Path(tmp) / "target.pdf"
+            image_path = Path(tmp) / "cover.png"
+            sample_pdf.write_bytes(_four_page_pdf())
+            target_pdf.write_bytes(_four_page_pdf())
+            image_path.write_bytes(_tiny_png())
+            model = LayoutModel.from_pdf(sample_pdf)
+            model.title = "Template Title"
+            model.author = "Template Author"
+            model.language = "ja"
+            model.exclude_cover_from_reading = True
+            model.delete_entry(1)
+            model.insert_blank(1)
+            model.insert_image(2, image_path)
+            model.set_cover_entry(model.entries[2])
+            project = BatchProject.from_template(model)
+            item = project.add_pdf(target_pdf)
+
+            applied = project._model_for_item(item)
+
+            self.assertEqual(["Page 1", "Blank 1", "cover", "Page 3", "Page 4"], [entry.label for entry in applied.entries])
+            self.assertEqual("target", applied.title)
+            self.assertEqual("Template Author", applied.author)
+            self.assertEqual("ja", applied.language)
+            self.assertTrue(applied.exclude_cover_from_reading)
+            self.assertEqual("inserted-0001", applied.cover_entry_id)
 
 
 if __name__ == "__main__":

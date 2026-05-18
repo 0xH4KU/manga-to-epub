@@ -95,26 +95,26 @@ Preset v2 shape:
 
 Detailed tasks:
 
-- [ ] Add stable entry identity for inserted images.
-- [ ] Save new presets as `version: 2` only.
-- [ ] Preserve loading of old `version: 1` presets.
-- [ ] Load v2 source entries in saved order, skipping missing source pages with a clear warning path if needed.
-- [ ] Load v2 blank entries in saved order.
-- [ ] Load v2 inserted entries by re-reading the saved image path.
-- [ ] Restore metadata fields from v2 presets.
-- [ ] Restore cover rule from v2 presets:
+- [x] Add stable entry identity for inserted images.
+- [x] Save new presets as `version: 2` only.
+- [x] Preserve loading of old `version: 1` presets.
+- [x] Load v2 source entries in saved order, skipping missing source pages with a clear warning path if needed.
+- [x] Load v2 blank entries in saved order.
+- [x] Load v2 inserted entries by re-reading the saved image path.
+- [x] Restore metadata fields from v2 presets.
+- [x] Restore cover rule from v2 presets:
   - first image fallback.
   - explicit source page.
   - explicit inserted entry.
-- [ ] Keep old v1 behavior for blank positions and deleted pages.
-- [ ] Add tests:
+- [x] Keep old v1 behavior for blank positions and deleted pages.
+- [x] Add tests:
   - v1 fixture still loads.
   - v2 round-trip preserves source, blank, inserted entry order.
   - v2 round-trip preserves title, author, language, and cover-only setting.
   - v2 round-trip restores inserted image cover.
   - missing inserted image path raises a clear `ValueError`.
-- [ ] Run focused tests, then full verification.
-- [ ] Commit with: `feat: add v2 layout presets`
+- [x] Run focused tests, then full verification.
+- [x] Commit with: `feat: add v2 layout presets`
 
 ## Wave 3 - Batch Project Preset Integration And Safety
 

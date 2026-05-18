@@ -28,6 +28,8 @@ class LayoutTemplate:
     language: str
     cover_source_index: int | None
     exclude_cover_from_reading: bool
+    cover_entry_id: str | None = None
+    entries: list[dict] = field(default_factory=list)
 
 
 class BatchProject:
@@ -50,6 +52,8 @@ class BatchProject:
                 language=model.language,
                 cover_source_index=model.cover_source_index,
                 exclude_cover_from_reading=model.exclude_cover_from_reading,
+                cover_entry_id=model.cover_entry_id,
+                entries=[model._preset_entry_payload(entry) for entry in model.entries],
             )
         )
 
@@ -112,19 +116,44 @@ class BatchProject:
 
     def _model_for_item(self, item: BatchItem) -> LayoutModel:
         model = LayoutModel.from_pdf(item.pdf_path)
-        deleted = set(self.template.deleted_source_pages)
-        model.entries = [entry for entry in model.entries if entry.source_index not in deleted]
-        model._blank_counter = 0
-        for position in self.template.blank_positions:
-            index = min(max(position, 0), len(model.entries))
-            model.insert_blank(index)
+        if self.template.entries:
+            payload = {
+                "version": 2,
+                "metadata": {
+                    "title": item.title or item.pdf_path.stem,
+                    "author": item.author or self.template.author,
+                    "language": self.template.language,
+                    "exclude_cover_from_reading": self.template.exclude_cover_from_reading,
+                },
+                "cover": self._cover_payload(),
+                "entries": self.template.entries,
+            }
+            model.apply_preset_payload(payload)
+        else:
+            deleted = set(self.template.deleted_source_pages)
+            model.entries = [entry for entry in model.entries if entry.source_index not in deleted]
+            model._blank_counter = 0
+            for position in self.template.blank_positions:
+                index = min(max(position, 0), len(model.entries))
+                model.insert_blank(index)
         model.title = item.title or item.pdf_path.stem
         model.author = item.author or self.template.author
         model.language = self.template.language
         model.exclude_cover_from_reading = self.template.exclude_cover_from_reading
-        if self.template.cover_source_index is not None:
+        if self.template.cover_entry_id is not None:
+            model.cover_entry_id = self.template.cover_entry_id
+            model.cover_source_index = None
+            model._ensure_valid_cover()
+        elif self.template.cover_source_index is not None:
             try:
                 model.set_cover(self.template.cover_source_index)
             except ValueError:
                 model.cover_source_index = model._first_image_source_index()
         return model
+
+    def _cover_payload(self) -> dict:
+        if self.template.cover_entry_id is not None:
+            return {"kind": "inserted", "source_index": None, "entry_id": self.template.cover_entry_id}
+        if self.template.cover_source_index is not None:
+            return {"kind": "source", "source_index": self.template.cover_source_index, "entry_id": None}
+        return {"kind": "first-image", "source_index": None, "entry_id": None}
