@@ -316,19 +316,19 @@ Files:
 
 Detailed tasks:
 
-- [ ] Add tests for window sizing configuration so the app opens with a more appropriate workbench geometry and minimum size.
-- [ ] Add tests for the inspector tab specification so future edits keep `Edit`, `Book`, and `Batch` grouped intentionally.
-- [ ] Move title, geometry, and minimum-size setup into a small window configuration helper.
-- [ ] Increase initial geometry from `1120x720` to a roomier workbench size while still allowing smaller supported windows.
-- [ ] Replace the single long right-side frame with a `ttk.Notebook`.
-- [ ] Put insert/delete/normalize controls in the `Edit` tab.
-- [ ] Put metadata, cover, and selected-image export controls in the `Book` tab.
-- [ ] Put batch template, add PDFs, validate, export ready, and export all controls in the `Batch` tab.
-- [ ] Make each inspector tab scrollable so every control remains reachable on shorter screens.
-- [ ] Move transient status text out of the toolbar into a bottom status bar.
-- [ ] Keep existing button labels for muscle memory and tests.
-- [ ] Run focused GUI tests, then full verification.
-- [ ] Commit with: `refactor: reshape layout editor workbench`
+- [x] Add tests for window sizing configuration so the app opens with a more appropriate workbench geometry and minimum size.
+- [x] Add tests for the inspector tab specification so future edits keep `Edit`, `Book`, and `Batch` grouped intentionally.
+- [x] Move title, geometry, and minimum-size setup into a small window configuration helper.
+- [x] Increase initial geometry from `1120x720` to a roomier workbench size while still allowing smaller supported windows.
+- [x] Replace the single long right-side frame with a `ttk.Notebook`.
+- [x] Put insert/delete/normalize controls in the `Edit` tab.
+- [x] Put metadata, cover, and selected-image export controls in the `Book` tab.
+- [x] Put batch template, add PDFs, validate, export ready, and export all controls in the `Batch` tab.
+- [x] Make each inspector tab scrollable so every control remains reachable on shorter screens.
+- [x] Move transient status text out of the toolbar into a bottom status bar.
+- [x] Keep existing button labels for muscle memory and tests.
+- [x] Run focused GUI tests, then full verification.
+- [x] Commit with: `refactor: reshape layout editor workbench`
 
 ## Wave 10 - Command Palette Efficiency Layer
 

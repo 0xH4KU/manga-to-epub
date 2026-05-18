@@ -71,6 +71,18 @@ class _FakeRoot:
     def __init__(self):
         self.bindings = {}
         self.after_calls = []
+        self.title_value = None
+        self.geometry_value = None
+        self.minsize_value = None
+
+    def title(self, value):
+        self.title_value = value
+
+    def geometry(self, value):
+        self.geometry_value = value
+
+    def minsize(self, width, height):
+        self.minsize_value = (width, height)
 
     def bind_all(self, sequence, callback):
         self.bindings[sequence] = callback
@@ -216,6 +228,19 @@ class EpubLayoutGuiPreviewTests(unittest.TestCase):
 
 
 class EpubLayoutGuiListTests(unittest.TestCase):
+    def test_configure_window_sets_workbench_geometry_and_minimum_size(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = _FakeRoot()
+
+        app._configure_window()
+
+        self.assertEqual("EPUB Layout Lab", app.root.title_value)
+        self.assertEqual("1280x760", app.root.geometry_value)
+        self.assertEqual((1100, 680), app.root.minsize_value)
+
+    def test_inspector_tabs_group_workbench_controls(self):
+        self.assertEqual(("Edit", "Book", "Batch"), EpubLayoutApp._inspector_tab_titles())
+
     def test_bind_shortcuts_registers_safe_layout_actions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.root = _FakeRoot()
