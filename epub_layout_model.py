@@ -33,6 +33,7 @@ class LayoutModel:
         language: str = "zh-Hant",
         cover_source_index: int | None = None,
         exclude_cover_from_reading: bool = False,
+        cover_entry_id: str | None = None,
     ):
         self.source_path = source_path
         self.entries = entries
@@ -42,6 +43,7 @@ class LayoutModel:
         self.author = author or ""
         self.language = language or "zh-Hant"
         self.cover_source_index = cover_source_index or self._first_image_source_index()
+        self.cover_entry_id = cover_entry_id
         self.exclude_cover_from_reading = exclude_cover_from_reading
 
     @classmethod
@@ -186,9 +188,9 @@ class LayoutModel:
         return exported, skipped
 
     def normalized_cover_item_id(self) -> str | None:
-        if self.cover_source_index is None:
-            return None
         for entry, page in zip(self.entries, self.normalized_pages()):
+            if self.cover_entry_id is not None and not entry.is_blank and entry.page.item_id == self.cover_entry_id:
+                return page.item_id
             if not entry.is_blank and entry.source_index == self.cover_source_index:
                 return page.item_id
         return None
@@ -198,6 +200,16 @@ class LayoutModel:
         if entry is None or entry.is_blank:
             raise ValueError("Cover must be an image page in the current layout")
         self.cover_source_index = source_index
+        self.cover_entry_id = None
+
+    def set_cover_entry(self, entry: LayoutEntry) -> None:
+        if entry.is_blank:
+            raise ValueError("Cover must be an image page in the current layout")
+        if entry.source_index is not None:
+            self.set_cover(entry.source_index)
+            return
+        self.cover_source_index = None
+        self.cover_entry_id = entry.page.item_id
 
     def save_preset(self, preset_path: Path) -> None:
         source_order = [entry.source_index for entry in self.entries if entry.source_index is not None]
@@ -262,9 +274,10 @@ class LayoutModel:
         return None
 
     def _ensure_valid_cover(self) -> None:
-        if self.cover_source_index is None:
-            self.cover_source_index = self._first_image_source_index()
-            return
+        if self.cover_entry_id is not None:
+            if any(not entry.is_blank and entry.page.item_id == self.cover_entry_id for entry in self.entries):
+                return
+            self.cover_entry_id = None
         if any(not entry.is_blank and entry.source_index == self.cover_source_index for entry in self.entries):
             return
         self.cover_source_index = self._first_image_source_index()

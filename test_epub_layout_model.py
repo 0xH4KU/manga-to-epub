@@ -7,6 +7,16 @@ from epub_layout_model import LayoutModel
 from test_pdf_to_cbz_lossless import _pdf_from_objects, _stream_object, _two_page_pdf_with_late_cover
 
 
+def _tiny_png():
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        b"\x00\x00\x00\rIHDR"
+        b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
+        b"\x90wS\xde"
+        b"\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+
 def _four_page_pdf():
     draw = b"q 2 0 0 1 0 0 cm /Im0 Do Q"
     image_template = (
@@ -228,13 +238,7 @@ class EpubLayoutModelTests(unittest.TestCase):
             self.assertEqual(b"\xff\xd8PAGE2\xff\xd9", (output_dir / "0003.jpg").read_bytes())
 
     def test_insert_external_png_exports_as_epub_page_and_selected_image(self):
-        png = (
-            b"\x89PNG\r\n\x1a\n"
-            b"\x00\x00\x00\rIHDR"
-            b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
-            b"\x90wS\xde"
-            b"\x00\x00\x00\x00IEND\xaeB`\x82"
-        )
+        png = _tiny_png()
         with tempfile.TemporaryDirectory() as tmp:
             pdf_path = Path(tmp) / "comic.pdf"
             image_path = Path(tmp) / "extra.png"
@@ -255,6 +259,64 @@ class EpubLayoutModelTests(unittest.TestCase):
                 self.assertEqual(png, archive.read("EPUB/images/page-0002.png"))
                 opf = archive.read("EPUB/content.opf").decode("utf-8")
                 self.assertIn('href="images/page-0002.png" media-type="image/png"', opf)
+
+    def test_inserted_image_can_be_set_as_cover(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            image_path = Path(tmp) / "cover.png"
+            epub_path = Path(tmp) / "comic.epub"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            image_path.write_bytes(_tiny_png())
+            model = LayoutModel.from_pdf(pdf_path)
+
+            model.insert_image(1, image_path)
+            model.set_cover_entry(model.entries[1])
+            model.export_epub(epub_path, overwrite=True)
+
+            with ZipFile(epub_path) as archive:
+                opf = archive.read("EPUB/content.opf").decode("utf-8")
+                self.assertIn(
+                    'id="img-0002" href="images/page-0002.png" media-type="image/png" properties="cover-image"',
+                    opf,
+                )
+
+    def test_inserted_cover_can_be_excluded_from_reading_pages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            image_path = Path(tmp) / "cover.png"
+            epub_path = Path(tmp) / "comic.epub"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            image_path.write_bytes(_tiny_png())
+            model = LayoutModel.from_pdf(pdf_path)
+            model.insert_image(1, image_path)
+            model.set_cover_entry(model.entries[1])
+            model.exclude_cover_from_reading = True
+
+            counts = model.export_epub(epub_path, overwrite=True)
+
+            self.assertEqual(2, counts["total"])
+            with ZipFile(epub_path) as archive:
+                names = archive.namelist()
+                opf = archive.read("EPUB/content.opf").decode("utf-8")
+                self.assertIn("EPUB/images/page-0002.png", names)
+                self.assertNotIn("EPUB/xhtml/page-0002.xhtml", names)
+                self.assertIn('properties="cover-image"', opf)
+                self.assertNotIn('idref="page-0002"', opf)
+
+    def test_deleting_inserted_cover_falls_back_to_first_source_image(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            image_path = Path(tmp) / "cover.png"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            image_path.write_bytes(_tiny_png())
+            model = LayoutModel.from_pdf(pdf_path)
+            model.insert_image(0, image_path)
+            model.set_cover_entry(model.entries[0])
+
+            model.delete_entry(0)
+
+            self.assertEqual(1, model.cover_source_index)
+            self.assertEqual("page-0001", model.normalized_cover_item_id())
 
     def test_model_can_exclude_cover_from_reading_pages(self):
         with tempfile.TemporaryDirectory() as tmp:

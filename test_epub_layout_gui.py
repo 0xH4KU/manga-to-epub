@@ -99,6 +99,12 @@ class _FakeDeleteModel:
     def set_cover(self, source_index):
         self.cover_source_index = source_index
 
+    def set_cover_entry(self, entry):
+        if entry.source_index is None:
+            self.cover_entry_id = entry.label
+        else:
+            self.set_cover(entry.source_index)
+
     def insert_image(self, index, image_path):
         self.entries.insert(index, _entry(f"Image {index + 1}"))
 
@@ -128,6 +134,10 @@ class _FakeBatchProject:
 def _entry(label, is_blank=False):
     source_index = None if is_blank else int(label.split()[-1])
     return SimpleNamespace(label=label, is_blank=is_blank, source_index=source_index)
+
+
+def _inserted_entry(label):
+    return SimpleNamespace(label=label, is_blank=False, source_index=None)
 
 
 def _app_for_preview(entries, selected):
@@ -326,6 +336,35 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual(2, app.model.cover_source_index)
         self.assertTrue(app.preserved_yview)
         self.assertEqual("Set Page 2 as cover.", app.status.value)
+
+    def test_set_selected_as_cover_accepts_inserted_images(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        inserted = _inserted_entry("Extra Cover")
+        app.model = _FakeDeleteModel([_entry("Page 1"), inserted])
+        app.model.set_cover_entry = lambda entry: setattr(app, "cover_entry", entry)
+        app.page_list = _FakeListbox(selection=1)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+
+        app.set_selected_as_cover()
+
+        self.assertIs(inserted, app.cover_entry)
+        self.assertTrue(app.preserved_yview)
+        self.assertEqual("Set Extra Cover as cover.", app.status.value)
+
+    def test_set_selected_as_cover_rejects_blank_pages(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Blank 1", is_blank=True)])
+        app.page_list = _FakeListbox(selection=1)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+
+        with patch("epub_layout_gui.messagebox.showerror") as showerror:
+            app.set_selected_as_cover()
+
+        showerror.assert_called_once_with("Set cover failed", "Cover must be an image page.")
+        self.assertEqual(1, app.model.cover_source_index)
+        self.assertFalse(hasattr(app, "preserved_yview"))
 
     def test_selected_indexes_support_multi_selection(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

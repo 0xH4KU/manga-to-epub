@@ -313,11 +313,11 @@ class EpubLayoutApp:
         if index is None:
             return
         entry = self.model.entries[index]
-        if entry.is_blank or entry.source_index is None:
+        if entry.is_blank:
             messagebox.showerror("Set cover failed", "Cover must be an image page.")
             return
         try:
-            self.model.set_cover(entry.source_index)
+            self.model.set_cover_entry(entry)
             self.refresh_list(preserve_yview=True)
             self.status.set(f"Set {entry.label} as cover.")
         except Exception as exc:
@@ -588,7 +588,12 @@ class EpubLayoutApp:
     def _is_cover_entry(self, entry: LayoutEntry) -> bool:
         if self.model is None:
             return False
-        return not entry.is_blank and entry.source_index == getattr(self.model, "cover_source_index", None)
+        if entry.is_blank:
+            return False
+        cover_entry_id = getattr(self.model, "cover_entry_id", None)
+        if cover_entry_id is not None:
+            return entry.page.item_id == cover_entry_id
+        return entry.source_index == getattr(self.model, "cover_source_index", None)
 
     def _export_done(self, epub_path: Path, counts: dict[str, int]) -> None:
         self.status.set(f"Exported {epub_path.name}: {counts['total']} spine items.")

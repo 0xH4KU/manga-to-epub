@@ -37,22 +37,22 @@ Files:
 
 Detailed tasks:
 
-- [ ] Add a model-level cover identifier that can reference both original PDF pages and inserted image entries.
-- [ ] Keep compatibility with the existing `cover_source_index` behavior so current tests and callers still work.
-- [ ] Update `LayoutModel.set_cover(...)` or add a spine-entry cover setter so callers can set cover by selected layout entry.
-- [ ] Update `normalized_cover_item_id()` so inserted image covers map to the normalized EPUB item id.
-- [ ] Ensure deleting the inserted cover falls back to the first available non-blank image.
-- [ ] Update GUI `Set Selected As Cover` to accept inserted image pages and still reject blanks.
-- [ ] Update the spine list marker so inserted image covers show `[cover]`.
-- [ ] Add model tests:
+- [x] Add a model-level cover identifier that can reference both original PDF pages and inserted image entries.
+- [x] Keep compatibility with the existing `cover_source_index` behavior so current tests and callers still work.
+- [x] Update `LayoutModel.set_cover(...)` or add a spine-entry cover setter so callers can set cover by selected layout entry.
+- [x] Update `normalized_cover_item_id()` so inserted image covers map to the normalized EPUB item id.
+- [x] Ensure deleting the inserted cover falls back to the first available non-blank image.
+- [x] Update GUI `Set Selected As Cover` to accept inserted image pages and still reject blanks.
+- [x] Update the spine list marker so inserted image covers show `[cover]`.
+- [x] Add model tests:
   - inserted PNG can be set as cover and appears with `properties="cover-image"` in OPF.
   - inserted cover can be excluded from reading spine while image remains in manifest.
   - deleting an inserted cover falls back to first original image.
-- [ ] Add GUI tests:
+- [x] Add GUI tests:
   - selecting an inserted image calls the cover setter and marks it as cover.
   - selecting a blank still shows an error and does not change cover.
-- [ ] Run focused tests, then full verification.
-- [ ] Commit with: `feat: allow inserted images as epub covers`
+- [x] Run focused tests, then full verification.
+- [x] Commit with: `feat: allow inserted images as epub covers`
 
 ## Wave 2 - Preset Format v2
 
