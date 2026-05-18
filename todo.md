@@ -1,207 +1,264 @@
-# EPUB Layout Lab Feature TODO
+# EPUB Layout Lab Improvement TODO
 
-Scope: add safer page operations, image export, metadata/cover editing, and a real multi-PDF batch project workflow for manga volume sets. Do not implement until this TODO is reviewed.
+Goal: turn the current manga PDF -> EPUB/CBZ toolkit from a working specialist utility into a safer, repeatable batch workflow for Apple Books manga layout correction.
 
-## Assumptions To Review
+Execution rule: work in small waves. Each wave must start with focused failing tests where behavior changes, then implementation, then full verification, then a commit. Do not start the next wave until the current wave is committed.
 
-- "Page 1 / page range" in quick delete means the current left-side Spine order, using 1-based positions after any inserted blanks or deleted pages.
-- Source page labels such as `Page 4` should remain visible for traceability, but exported EPUB internal filenames/item ids can be normalized to sequential spine positions.
-- "Selected image export" means exporting selected non-blank source images losslessly to a folder. Blank pages are skipped with a warning/status line.
-- "Insert image" means adding an external image as a real EPUB page in the editable spine, not modifying the original PDF.
-- "Set cover" means choosing which spine entry is marked as the EPUB cover image. By default this is the first non-blank image page.
-- Batch Project is the preferred direction over the current preset-file-first workflow.
+Baseline verification command for every wave:
 
-## Phase 0 - Safety Baseline
+```bash
+./.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_model.py epub_batch_model.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py
+./.venv/bin/python -m unittest
+```
 
-- [x] Run the current test suite before changes: `python -m py_compile ...` and `python -m unittest`.
-- [x] Add regression tests before implementation for each model-level behavior that changes.
-- [ ] Keep existing preset JSON compatibility; old presets with `version: 1` must still load.
-- [ ] Keep lossless behavior for original PDF image streams.
-- [ ] Avoid destructive UI actions without confirmation when deleting real source pages or overwriting EPUBs.
+Current baseline: 47 tests pass in the project `.venv`.
 
-## Phase 1 - Core Layout Model Cleanup
+## Wave 0 - Planning Baseline
 
-- [x] Add a layout normalization operation.
-  - [x] Rebuild exported image hrefs, XHTML hrefs, item ids, nav labels, and spine itemrefs in current spine order.
-  - [x] Keep source page identity separately so the UI can still show "source Page 4" after normalization.
-  - [x] Ensure blanks get deterministic sequential ids such as `blank-0002`.
-  - [ ] Ensure inserted external image pages get deterministic sequential ids.
-  - [ ] Make normalization idempotent: running it twice should not change the result again.
-- [x] Decide when normalization runs.
-  - [x] Provide a manual "Normalize Export Order" button.
-  - [x] Also run normalization automatically before EPUB export.
-- [x] Add tests for the case where deleting pages leaves spine position `0001` pointing to source page 4.
-- [x] Add tests proving the exported EPUB has sequential manifest/spine/nav ids after delete/insert operations.
+Purpose: replace the old feature TODO with this execution checklist so future commits are traceable by wave.
 
-## Phase 2 - Quick Delete Tools
+- [x] Rewrite `todo.md` as this detailed wave plan.
+- [x] Keep already-completed historical work visible through the current code/tests rather than a stale mixed checklist.
+- [x] Verify baseline commands pass.
+- [x] Commit with: `docs: expand improvement todo by wave`
 
-- [x] Add model helpers for deleting spine ranges safely.
-  - [x] Delete first N spine entries.
-  - [x] Delete last N spine entries.
-  - [x] Delete inclusive range A-B.
-  - [x] Clamp or reject invalid ranges with clear errors.
-  - [x] Return deleted entries for undo/recover support.
-- [x] Add GUI controls in a new "Quick delete" area.
-  - [x] "Delete first [N] pages".
-  - [x] "Delete last [N] pages".
-  - [x] "Delete range [A] to [B]".
-  - [x] Confirmation dialog for ranges containing real source or inserted image pages.
-  - [ ] No confirmation needed for blank-only deletion, unless the range is large.
-- [x] Preserve current recover behavior.
-  - [x] Recover batch-deleted entries as one undo group.
-  - [x] Keep `Cmd+Z` / `Ctrl+Z` restoring the whole last operation.
-- [ ] Test blank-only, source-page, mixed, empty-model, negative, zero, reversed-range, and over-large range cases.
+## Wave 1 - Inserted Image Cover Support
 
-## Phase 3 - Selected Image Export
+Purpose: allow an externally inserted JPEG/PNG page to be selected as the EPUB cover, including when the cover is excluded from reading pages.
 
-- [x] Allow multi-selection in the spine list.
-- [x] Add "Export Selected Images..." action.
-  - [x] Ask for an output folder.
-  - [x] Export only selected non-blank entries with original image bytes where possible.
-  - [x] Use collision-safe filenames.
-  - [ ] Offer filename mode: spine order (`0001.jpg`) vs source page (`source-0004.jpg`).
-- [x] Handle edge cases.
-  - [x] Selected blanks only: show a friendly "No exportable images selected" message.
-  - [x] Mixed blanks/images: export images and report skipped blanks.
-  - [x] Inserted external images: export their stored bytes too.
-  - [ ] Existing files: confirm overwrite or auto-suffix.
-- [x] Add tests for filename generation and blank skipping.
+Why this matters: manga collections often have a separately sourced high-quality cover. The model already supports inserted image pages, but cover identity is still tied to original PDF `source_index`, so inserted images cannot currently be marked as cover.
 
-## Phase 4 - External Image Insertion
+Files:
 
-- [x] Add model support for external image entries.
-  - [x] Accept JPEG and PNG first.
-  - [x] Store bytes, dimensions, media type, source path, and a stable entry type.
-  - [x] Insert before/after selected spine position.
-  - [x] Include inserted images in EPUB export and selected-image export.
-- [x] Add GUI actions.
-  - [x] "Insert Image Before".
-  - [x] "Insert Image After".
-  - [x] Preview inserted images in the spread canvas.
-- [x] Edge cases.
-  - [x] Unsupported file type.
-  - [x] Corrupt image.
-  - [ ] Very large image.
-  - [ ] Inserting into an empty layout should be rejected unless a page size can be inferred.
-- [x] Add tests for inserted image export.
+- Modify `epub_layout_model.py`
+- Modify `epub_layout_gui.py`
+- Test `test_epub_layout_model.py`
+- Test `test_epub_layout_gui.py`
 
-## Phase 5 - Metadata And Cover
+Detailed tasks:
 
-- [x] Add metadata fields to the model/export path.
-  - [x] Title.
-  - [x] Author/creator.
-  - [x] Language, defaulting to `zh-Hant`.
-  - [ ] Optional series/volume fields if useful for batch naming.
-- [x] Update EPUB OPF generation.
-  - [x] Write `<dc:title>`.
-  - [x] Write `<dc:creator>` when author is set.
-  - [x] Mark selected cover image with `properties="cover-image"`.
-  - [x] Do not mark a blank page as cover.
-- [x] Add GUI controls.
-  - [x] Editable title field, default from PDF stem.
-  - [x] Editable author field.
-  - [x] "Set Selected As Cover".
-  - [x] Visual marker in spine list for the cover entry.
-- [x] Edge cases.
-  - [x] If selected cover is deleted, fall back to first non-blank image.
-  - [x] If no image pages remain, block EPUB export.
-  - [ ] If cover is an inserted image, include it correctly in the manifest.
-- [x] Add tests for OPF metadata escaping, cover selection, and cover deletion fallback.
+- [ ] Add a model-level cover identifier that can reference both original PDF pages and inserted image entries.
+- [ ] Keep compatibility with the existing `cover_source_index` behavior so current tests and callers still work.
+- [ ] Update `LayoutModel.set_cover(...)` or add a spine-entry cover setter so callers can set cover by selected layout entry.
+- [ ] Update `normalized_cover_item_id()` so inserted image covers map to the normalized EPUB item id.
+- [ ] Ensure deleting the inserted cover falls back to the first available non-blank image.
+- [ ] Update GUI `Set Selected As Cover` to accept inserted image pages and still reject blanks.
+- [ ] Update the spine list marker so inserted image covers show `[cover]`.
+- [ ] Add model tests:
+  - inserted PNG can be set as cover and appears with `properties="cover-image"` in OPF.
+  - inserted cover can be excluded from reading spine while image remains in manifest.
+  - deleting an inserted cover falls back to first original image.
+- [ ] Add GUI tests:
+  - selecting an inserted image calls the cover setter and marks it as cover.
+  - selecting a blank still shows an error and does not change cover.
+- [ ] Run focused tests, then full verification.
+- [ ] Commit with: `feat: allow inserted images as epub covers`
 
-## Phase 6 - Preset Format Upgrade
+## Wave 2 - Preset Format v2
 
-- [ ] Introduce preset `version: 2`.
-  - [ ] Store operations or normalized entry descriptors instead of only blank positions and deleted pages.
-  - [ ] Store metadata template options separately from per-book metadata.
-  - [ ] Store cover rule: first image, explicit source page, explicit spine position, or per-book override.
-  - [ ] Store quick-delete operations in a way that can be applied to different page counts safely.
-- [ ] Keep loading version 1 presets.
-  - [ ] Convert v1 blank positions and deleted source pages into the new in-memory plan.
-  - [ ] Save new presets as v2 only.
-- [ ] Validate preset application.
-  - [ ] Same source page count: apply directly.
-  - [ ] Different page count: warn and show what operations still apply.
-  - [ ] Missing source pages after delete rules: skip with warning, not crash.
-- [ ] Add tests for v1 compatibility and v2 round-trip.
+Purpose: make presets capture the real edited layout, metadata, cover rules, and inserted-image references while still loading version 1 presets.
 
-## Phase 7 - Batch Project Workflow
+Why this matters: the current preset only stores deleted source pages and blank positions. That is enough for early blank-page correction, but not enough for inserted images, metadata defaults, cover-only exports, or future batch workflows.
 
-- [x] Add a batch project data model.
-  - [x] Queue item: PDF path, page count, title, author, output path, status, warnings, error text.
-  - [x] Shared layout plan derived from the currently edited sample PDF.
-  - [x] Per-PDF title/author fields in the data model.
-- [x] Add GUI structure for the batch workspace.
-  - [x] Left queue of PDFs with status: Pending, Ready, Warning, Exported, Failed.
-  - [x] "Use Current Layout As Batch Template".
-  - [x] "Add PDFs...".
-  - [x] "Validate Batch...".
-  - [x] "Export Ready...".
-  - [ ] "Export All".
-- [x] Batch validation.
-  - [x] Detect page count mismatch.
-  - [x] Detect output filename collisions.
-  - [x] Detect unsupported/corrupt PDFs before export.
-  - [x] Report warnings per queue item without stopping the whole batch.
-- [x] Batch export behavior.
-  - [x] Continue exporting other files if one fails.
-  - [x] Show a final summary with exported/failed/skipped counts.
-  - [x] Write EPUBs to a chosen output directory.
-  - [x] Run normalization before each export.
-- [ ] Preset integration.
-  - [ ] Still support saving/loading presets.
-  - [ ] Allow creating a batch project from a saved preset.
-  - [ ] Allow exporting a preset from the current batch template.
-- [x] Add tests for queue validation and partial failure handling.
+Files:
 
-## Phase 8 - GUI Polish And Usability
+- Modify `epub_layout_model.py`
+- Modify `epub_batch_model.py`
+- Modify `epub_layout_gui.py` only if GUI messages or commands need small adjustments
+- Test `test_epub_layout_model.py`
+- Test `test_epub_batch_model.py`
 
-- [ ] Reorganize right-side controls into clear groups.
-  - [ ] Insert.
-  - [ ] Delete.
-  - [ ] Export.
-  - [ ] Metadata.
-  - [ ] Batch.
-- [ ] Keep the utilitarian Tkinter style, but reduce button clutter.
-- [ ] Add status messages that say exactly what changed: deleted count, skipped blanks, normalized entries, exported count.
-- [ ] Add keyboard shortcuts only where safe.
-  - [ ] Delete selected page/range.
-  - [ ] Undo/recover last delete group.
-  - [ ] Export selected images.
-- [ ] Avoid UI freezes during PDF loading, validation, thumbnail generation, and batch export.
+Preset v2 shape:
 
-## Phase 9 - Documentation
+```json
+{
+  "version": 2,
+  "source_page_count": 4,
+  "metadata": {
+    "title": "Sample Title",
+    "author": "Sample Author",
+    "language": "zh-Hant",
+    "exclude_cover_from_reading": false
+  },
+  "cover": {
+    "kind": "source",
+    "source_index": 1,
+    "entry_id": null
+  },
+  "entries": [
+    {"kind": "source", "source_index": 1},
+    {"kind": "blank"},
+    {"kind": "inserted", "path": "/absolute/path/extra.png"}
+  ]
+}
+```
 
-- [ ] Update README GUI workflow.
-- [ ] Document quick delete semantics.
-- [ ] Document normalization and why source labels can differ from exported filenames.
-- [ ] Document selected image export.
-- [ ] Document metadata and cover controls.
-- [ ] Document batch project workflow with a recommended volume-set flow.
-- [ ] Add a migration note for old presets.
+Detailed tasks:
 
-## Open Questions For Review
+- [ ] Add stable entry identity for inserted images.
+- [ ] Save new presets as `version: 2` only.
+- [ ] Preserve loading of old `version: 1` presets.
+- [ ] Load v2 source entries in saved order, skipping missing source pages with a clear warning path if needed.
+- [ ] Load v2 blank entries in saved order.
+- [ ] Load v2 inserted entries by re-reading the saved image path.
+- [ ] Restore metadata fields from v2 presets.
+- [ ] Restore cover rule from v2 presets:
+  - first image fallback.
+  - explicit source page.
+  - explicit inserted entry.
+- [ ] Keep old v1 behavior for blank positions and deleted pages.
+- [ ] Add tests:
+  - v1 fixture still loads.
+  - v2 round-trip preserves source, blank, inserted entry order.
+  - v2 round-trip preserves title, author, language, and cover-only setting.
+  - v2 round-trip restores inserted image cover.
+  - missing inserted image path raises a clear `ValueError`.
+- [ ] Run focused tests, then full verification.
+- [ ] Commit with: `feat: add v2 layout presets`
 
-- [ ] Should quick delete page numbers refer to current spine positions or original PDF source page numbers?
-- [ ] Should "Normalize Export Order" rename only exported EPUB internals, or also change visible list labels from `Page 4` to `Page 1`?
-- [ ] For selected image export, do you prefer filenames by current spine order or original source page number as the default?
-- [ ] Should inserted external images be included in presets, or should presets store only their positions and require re-linking image files?
-- [ ] In batch projects, should one sample layout be mandatory, or should the queue support per-PDF independent edits from day one?
-- [ ] Should batch export auto-fill titles from PDF filenames only, or support a series template such as `Book Name Vol. {n}`?
+## Wave 3 - Batch Project Preset Integration And Safety
 
-## Suggested Implementation Order
+Purpose: connect the newer batch project workflow to presets and make batch export safer before overwriting files.
 
-- [ ] First: model normalization plus quick delete, because they fix page-order correctness and deletion speed.
-- [x] Second: metadata and cover, because they touch EPUB OPF and should be stable before batch export.
-- [x] Third: selected image export and external image insertion.
-- [ ] Fourth: preset v2 compatibility.
-- [x] Fifth: batch project queue and validation.
-- [ ] Sixth: README and GUI polish.
+Why this matters: batch processing is the workflow that benefits most from presets, but the GUI still has an older preset-first batch path and the batch project lacks an explicit "export all warnings too" control.
 
-## Verification Checklist Before Marking Complete
+Files:
 
-- [ ] `python -m py_compile epub_layout_gui.py epub_layout_model.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py`
-- [ ] `python -m unittest`
-- [ ] Manual GUI smoke test: open PDF, quick delete, normalize, undo, export EPUB.
-- [ ] Manual GUI smoke test: set title/author/cover and inspect OPF inside EPUB.
-- [ ] Manual GUI smoke test: export selected images.
-- [ ] Manual GUI smoke test: batch project with at least two PDFs, one matching and one mismatched.
+- Modify `epub_batch_model.py`
+- Modify `epub_layout_gui.py`
+- Test `test_epub_batch_model.py`
+- Test `test_epub_layout_gui.py`
+
+Detailed tasks:
+
+- [ ] Teach `LayoutTemplate` to preserve enough v2 preset information for inserted images and cover rules.
+- [ ] Allow creating a `BatchProject` from a saved preset.
+- [ ] Allow exporting/saving a preset from the current batch template if needed by the GUI flow.
+- [ ] Add an `Export All...` GUI action that exports ready and warning items, while still skipping failed items.
+- [ ] Add a preflight warning for output files that already exist before batch export starts.
+- [ ] Keep `Export Ready...` conservative: ready items only.
+- [ ] Keep older `Batch Apply` path available until the new batch-project path covers it fully.
+- [ ] Add tests:
+  - batch project from v2 preset applies source deletion, blanks, metadata, and cover.
+  - `export_ready` skips warning items.
+  - `export_all` exports warning items and skips failed items.
+  - output collision warnings remain visible in queue items.
+- [ ] Run focused tests, then full verification.
+- [ ] Commit with: `feat: integrate presets with batch projects`
+
+## Wave 4 - GUI Usability Polish
+
+Purpose: make the Tkinter layout editor less cluttered and clearer during repeated work, without changing the utilitarian style.
+
+Why this matters: the right control column has grown into a long list of buttons. Manga layout correction is repetitive, so better grouping and status messages reduce mistakes.
+
+Files:
+
+- Modify `epub_layout_gui.py`
+- Test `test_epub_layout_gui.py`
+
+Detailed tasks:
+
+- [ ] Reorganize right-side controls into labeled groups:
+  - Insert
+  - Delete
+  - Metadata
+  - Export
+  - Batch
+- [ ] Keep existing button text where tests or muscle memory depend on it.
+- [ ] Improve status messages:
+  - deletion reports count and blank/source mix.
+  - selected image export reports exported count and skipped blanks.
+  - normalization says how many entries will be normalized during export.
+  - batch validation reports ready/warning/failed counts.
+- [ ] Add safe keyboard shortcuts:
+  - Delete selected page.
+  - Undo/recover last delete group.
+  - Export selected images.
+- [ ] Avoid adding visual complexity beyond standard Tkinter/ttk widgets.
+- [ ] Add GUI tests for status-message behavior that can be tested without opening real dialogs.
+- [ ] Run focused tests, then full verification.
+- [ ] Commit with: `refactor: clarify layout editor controls`
+
+## Wave 5 - Responsiveness And Long-Task Guardrails
+
+Purpose: reduce UI freezing when loading large PDFs, validating batches, and generating previews.
+
+Why this matters: the current export paths use background threads, but opening PDFs, validating batch queues, and thumbnail rendering can still block the main Tkinter event loop.
+
+Files:
+
+- Modify `epub_layout_gui.py`
+- Modify model files only if small helper extraction is needed
+- Test `test_epub_layout_gui.py`
+
+Detailed tasks:
+
+- [ ] Move PDF open/load work into a background thread.
+- [ ] Move batch validation into a background thread.
+- [ ] Prevent duplicate long-running actions while a worker is active.
+- [ ] Add a simple busy/status state for long tasks.
+- [ ] Keep all Tkinter UI updates on the main thread via `root.after(...)`.
+- [ ] Cache thumbnails by stable entry identity rather than object identity when possible.
+- [ ] Add tests around worker completion callbacks and busy-state transitions.
+- [ ] Run focused tests, then full verification.
+- [ ] Commit with: `perf: keep layout editor responsive during long tasks`
+
+## Wave 6 - EPUB Self-Check And Metadata Hygiene
+
+Purpose: add lightweight internal validation of generated EPUBs and clean up metadata behavior.
+
+Why this matters: Apple Books is the primary target, but catching missing manifest items, broken spine refs, or invalid cover references before import saves time.
+
+Files:
+
+- Modify `pdf_to_epub_lossless.py`
+- Modify `epub_layout_model.py` if export API needs to expose self-check results
+- Test `test_pdf_to_epub_lossless.py`
+- Test `test_epub_layout_model.py`
+
+Detailed tasks:
+
+- [ ] Add an internal EPUB self-check helper that validates:
+  - `mimetype` is first and stored.
+  - `META-INF/container.xml` exists.
+  - `EPUB/content.opf` exists.
+  - every spine `idref` has a manifest XHTML item.
+  - every XHTML/image href referenced by OPF exists in the zip.
+  - cover image property points to an image item that exists.
+- [ ] Run self-check automatically after EPUB export.
+- [ ] Keep self-check errors as `PdfImageError` with specific messages.
+- [ ] Decide and document timestamp behavior:
+  - keep deterministic default if reproducibility is preferred.
+  - or write current UTC modified time if real metadata freshness is preferred.
+- [ ] Add tests for a valid generated EPUB passing self-check.
+- [ ] Add unit tests for broken OPF references failing self-check.
+- [ ] Run focused tests, then full verification.
+- [ ] Commit with: `feat: validate generated epub structure`
+
+## Wave 7 - Documentation Refresh
+
+Purpose: update user-facing docs to match the improved workflow.
+
+Files:
+
+- Modify `README.md`
+- Modify `todo.md`
+
+Detailed tasks:
+
+- [ ] Document inserted image covers.
+- [ ] Document preset v1 compatibility and v2 behavior.
+- [ ] Document batch project from preset.
+- [ ] Document `Export Ready...` vs `Export All...`.
+- [ ] Document EPUB self-check behavior.
+- [ ] Mark completed waves in this file.
+- [ ] Run full verification.
+- [ ] Commit with: `docs: document improved layout workflow`
+
+## Completion Checklist
+
+- [ ] All waves above are either complete and committed or intentionally deferred.
+- [ ] `git log --oneline` shows one commit per completed wave.
+- [ ] Full verification command passes.
+- [ ] `git status --short` is clean except for intentionally untracked local books/output files ignored by `.gitignore`.
