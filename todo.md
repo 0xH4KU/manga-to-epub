@@ -262,3 +262,141 @@ Detailed tasks:
 - [x] `git log --oneline` shows one commit per completed wave.
 - [x] Full verification command passes.
 - [x] `git status --short` is clean except for intentionally untracked local books/output files ignored by `.gitignore`.
+
+## UI Refresh Continuation - Professional Workbench
+
+Goal: turn the current crowded Tkinter editor into a professional, non-clipping desktop workbench while keeping the tool practical for manga EPUB layout correction.
+
+Design direction: combine the approved A/C mockup direction. Keep the A-style inspector workbench as the main structure: left navigation, center RTL preview, right inspector. Add a lighter C-style efficiency layer: command entry, keyboard access, validation/status feedback, and stronger batch visibility. Do this in small waves so each step is easy to review and revert.
+
+Primary UI problems to fix:
+
+- The current right control column stacks every action vertically, so bottom controls are clipped on shorter screens.
+- The toolbar mixes workflow actions and status text, making the top of the app feel ordinary and crowded.
+- Batch state is visually buried even though batch workflows are now a core feature.
+- There is no professional "command surface" for frequent actions.
+- Status messages are useful but not separated from persistent workspace health.
+
+Execution rule: continue committing by wave. For every behavior change, write a focused failing test first, run it to verify the red state, implement the minimum code, run focused tests, then run full verification before committing.
+
+Baseline verification command for every UI refresh wave:
+
+```bash
+./.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_model.py epub_batch_model.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py
+./.venv/bin/python -m unittest
+```
+
+## Wave 8 - UI Refresh Planning Baseline
+
+Purpose: capture the approved A/C hybrid direction in `todo.md` before touching the GUI code.
+
+Files:
+
+- Modify `todo.md`
+
+Detailed tasks:
+
+- [x] Append this UI refresh continuation section.
+- [x] Document the non-clipping inspector goal.
+- [x] Document the professional workbench direction.
+- [x] Split implementation into small waves with expected tests and commit messages.
+- [x] Run full verification to prove the planning-only change did not disturb the codebase.
+- [x] Commit with: `docs: plan professional ui refresh`
+
+## Wave 9 - Workbench Shell And Non-Clipping Inspector
+
+Purpose: reshape the main window into the approved professional workbench layout and remove the clipped right-side control stack.
+
+Why this matters: the current GUI can hide bottom controls even when the window is maximized. A tabbed, scrollable inspector keeps every control reachable and makes the app feel like an editing tool instead of a long form.
+
+Files:
+
+- Modify `epub_layout_gui.py`
+- Test `test_epub_layout_gui.py`
+
+Detailed tasks:
+
+- [ ] Add tests for window sizing configuration so the app opens with a more appropriate workbench geometry and minimum size.
+- [ ] Add tests for the inspector tab specification so future edits keep `Edit`, `Book`, and `Batch` grouped intentionally.
+- [ ] Move title, geometry, and minimum-size setup into a small window configuration helper.
+- [ ] Increase initial geometry from `1120x720` to a roomier workbench size while still allowing smaller supported windows.
+- [ ] Replace the single long right-side frame with a `ttk.Notebook`.
+- [ ] Put insert/delete/normalize controls in the `Edit` tab.
+- [ ] Put metadata, cover, and selected-image export controls in the `Book` tab.
+- [ ] Put batch template, add PDFs, validate, export ready, and export all controls in the `Batch` tab.
+- [ ] Make each inspector tab scrollable so every control remains reachable on shorter screens.
+- [ ] Move transient status text out of the toolbar into a bottom status bar.
+- [ ] Keep existing button labels for muscle memory and tests.
+- [ ] Run focused GUI tests, then full verification.
+- [ ] Commit with: `refactor: reshape layout editor workbench`
+
+## Wave 10 - Command Palette Efficiency Layer
+
+Purpose: add the first C-style power feature without overwhelming the A-style workbench.
+
+Why this matters: professional tools usually expose a fast action surface. A command palette makes repeated layout operations easier while keeping the visible interface calmer.
+
+Files:
+
+- Modify `epub_layout_gui.py`
+- Test `test_epub_layout_gui.py`
+
+Detailed tasks:
+
+- [ ] Add tests for command matching so typed queries find expected actions.
+- [ ] Add tests for command execution dispatch so palette commands call the intended app methods.
+- [ ] Add tests that `Command-K` and `Control-K` are bound to the command palette.
+- [ ] Add a compact `Command Palette...` entry point in the toolbar.
+- [ ] Implement a lightweight Tkinter palette with an entry, filtered listbox, Enter execution, double-click execution, and Escape close.
+- [ ] Include core commands:
+  - Open PDF
+  - Export EPUB
+  - Save Preset
+  - Load Preset
+  - Batch Apply
+  - Insert Blank Before
+  - Insert Blank After
+  - Insert Image Before
+  - Insert Image After
+  - Delete Selected Page
+  - Recover Last Deleted
+  - Set Selected As Cover
+  - Export Selected Images
+  - Validate Batch
+  - Export Ready Batch
+  - Export All Batch
+- [ ] Keep commands safe by reusing existing methods and their current guards.
+- [ ] Run focused GUI tests, then full verification.
+- [ ] Commit with: `feat: add command palette for layout actions`
+
+## Wave 11 - Workspace Status And Batch Feedback
+
+Purpose: add persistent professional status feedback without turning the UI into a dashboard.
+
+Why this matters: transient messages say what just happened, but users also need stable context: page count, queue count, and batch readiness. A bottom status bar gives that context without crowding the editing surface.
+
+Files:
+
+- Modify `epub_layout_gui.py`
+- Test `test_epub_layout_gui.py`
+
+Detailed tasks:
+
+- [ ] Add tests for a workspace summary string with no PDF loaded.
+- [ ] Add tests for a workspace summary string with page count and batch counts.
+- [ ] Add a second status variable for persistent workspace summary.
+- [ ] Show transient status on the left side of the bottom bar.
+- [ ] Show persistent workspace summary on the right side of the bottom bar.
+- [ ] Update the summary after opening PDFs, refreshing the spine list, adding PDFs, validating batches, and exporting batches.
+- [ ] Include ready/warning/failed batch counts when a batch project exists.
+- [ ] Keep wording compact enough for small windows.
+- [ ] Run focused GUI tests, then full verification.
+- [ ] Commit with: `feat: add workspace status summary`
+
+## UI Refresh Completion Checklist
+
+- [ ] Right-side controls no longer clip on the provided screenshot-sized window.
+- [ ] The main app reads as a professional editing workbench: navigation, preview, inspector, command access, and status bar.
+- [ ] All existing layout, preset, batch, export, and validation behavior remains intact.
+- [ ] Full verification command passes after every wave.
+- [ ] `git log --oneline` shows one commit per UI refresh wave.
