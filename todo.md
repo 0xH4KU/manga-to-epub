@@ -343,12 +343,12 @@ Files:
 
 Detailed tasks:
 
-- [ ] Add tests for command matching so typed queries find expected actions.
-- [ ] Add tests for command execution dispatch so palette commands call the intended app methods.
-- [ ] Add tests that `Command-K` and `Control-K` are bound to the command palette.
-- [ ] Add a compact `Command Palette...` entry point in the toolbar.
-- [ ] Implement a lightweight Tkinter palette with an entry, filtered listbox, Enter execution, double-click execution, and Escape close.
-- [ ] Include core commands:
+- [x] Add tests for command matching so typed queries find expected actions.
+- [x] Add tests for command execution dispatch so palette commands call the intended app methods.
+- [x] Add tests that `Command-K` and `Control-K` are bound to the command palette.
+- [x] Add a compact `Command Palette...` entry point in the toolbar.
+- [x] Implement a lightweight Tkinter palette with an entry, filtered listbox, Enter execution, double-click execution, and Escape close.
+- [x] Include core commands:
   - Open PDF
   - Export EPUB
   - Save Preset
@@ -365,9 +365,9 @@ Detailed tasks:
   - Validate Batch
   - Export Ready Batch
   - Export All Batch
-- [ ] Keep commands safe by reusing existing methods and their current guards.
-- [ ] Run focused GUI tests, then full verification.
-- [ ] Commit with: `feat: add command palette for layout actions`
+- [x] Keep commands safe by reusing existing methods and their current guards.
+- [x] Run focused GUI tests, then full verification.
+- [x] Commit with: `feat: add command palette for layout actions`
 
 ## Wave 11 - Workspace Status And Batch Feedback
 

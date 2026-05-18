@@ -247,15 +247,36 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.recover_last_deleted = lambda: setattr(app, "recovered", True)
         app.delete_selected_entry = lambda: setattr(app, "deleted", True)
         app.export_selected_images = lambda: setattr(app, "exported", True)
+        app.open_command_palette = lambda: setattr(app, "palette_opened", True)
 
         app._bind_shortcuts()
         app.root.bindings["<Delete>"](None)
         app.root.bindings["<Command-Shift-E>"](None)
+        app.root.bindings["<Command-k>"](None)
 
         self.assertIn("<Command-z>", app.root.bindings)
         self.assertIn("<Control-z>", app.root.bindings)
+        self.assertIn("<Command-k>", app.root.bindings)
+        self.assertIn("<Control-k>", app.root.bindings)
         self.assertTrue(app.deleted)
         self.assertTrue(app.exported)
+        self.assertTrue(app.palette_opened)
+
+    def test_command_palette_queries_match_action_labels(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+
+        labels = [command.label for command in app._matching_commands("cover")]
+
+        self.assertIn("Set Selected As Cover", labels)
+        self.assertNotIn("Export EPUB", labels)
+
+    def test_command_palette_dispatches_to_existing_app_method(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.insert_blank = lambda before: setattr(app, "insert_before", before)
+
+        app._execute_command("Insert Blank Before")
+
+        self.assertTrue(app.insert_before)
 
     def test_run_background_sets_and_clears_busy_state(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

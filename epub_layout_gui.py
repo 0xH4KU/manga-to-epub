@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import threading
 import tkinter as tk
+from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
@@ -12,6 +13,14 @@ import fitz
 
 from epub_batch_model import BatchProject
 from epub_layout_model import LayoutEntry, LayoutModel
+
+
+@dataclass(frozen=True)
+class AppCommand:
+    label: str
+    method_name: str
+    args: tuple = ()
+    keywords: tuple[str, ...] = ()
 
 
 class EpubLayoutApp:
@@ -54,6 +63,8 @@ class EpubLayoutApp:
         self.root.bind_all("<BackSpace>", lambda _event: self.delete_selected_entry())
         self.root.bind_all("<Command-Shift-E>", lambda _event: self.export_selected_images())
         self.root.bind_all("<Control-Shift-E>", lambda _event: self.export_selected_images())
+        self.root.bind_all("<Command-k>", lambda _event: self.open_command_palette())
+        self.root.bind_all("<Control-k>", lambda _event: self.open_command_palette())
 
     def _run_background(self, status_message: str, work, on_success) -> bool:
         if getattr(self, "_busy", False):
@@ -89,6 +100,7 @@ class EpubLayoutApp:
         ttk.Button(toolbar, text="Save Preset", command=self.save_preset).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(toolbar, text="Load Preset", command=self.load_preset).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(toolbar, text="Batch Apply", command=self.batch_apply_preset).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(toolbar, text="Command Palette...", command=self.open_command_palette).pack(side=tk.RIGHT)
 
         main = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
         main.pack(fill=tk.BOTH, expand=True)
@@ -197,6 +209,81 @@ class EpubLayoutApp:
         ttk.Button(parent, text="Validate Batch...", command=self.validate_batch).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(parent, text="Export Ready...", command=self.export_ready_batch).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(parent, text="Export All...", command=self.export_all_batch).pack(fill=tk.X, pady=(8, 0))
+
+    def _commands(self) -> tuple[AppCommand, ...]:
+        return (
+            AppCommand("Open PDF", "open_pdf", keywords=("import", "load")),
+            AppCommand("Export EPUB", "export_epub", keywords=("save",)),
+            AppCommand("Save Preset", "save_preset", keywords=("layout",)),
+            AppCommand("Load Preset", "load_preset", keywords=("layout",)),
+            AppCommand("Batch Apply", "batch_apply_preset", keywords=("preset",)),
+            AppCommand("Insert Blank Before", "insert_blank", (True,), ("page",)),
+            AppCommand("Insert Blank After", "insert_blank", (False,), ("page",)),
+            AppCommand("Insert Image Before", "insert_image", (True,), ("page",)),
+            AppCommand("Insert Image After", "insert_image", (False,), ("page",)),
+            AppCommand("Delete Selected Page", "delete_selected_entry", keywords=("remove",)),
+            AppCommand("Recover Last Deleted", "recover_last_deleted", keywords=("undo",)),
+            AppCommand("Set Selected As Cover", "set_selected_as_cover", keywords=("metadata",)),
+            AppCommand("Export Selected Images", "export_selected_images", keywords=("extract",)),
+            AppCommand("Validate Batch", "validate_batch", keywords=("check",)),
+            AppCommand("Export Ready Batch", "export_ready_batch", keywords=("batch",)),
+            AppCommand("Export All Batch", "export_all_batch", keywords=("batch", "warnings")),
+        )
+
+    def _matching_commands(self, query: str) -> list[AppCommand]:
+        words = [word.casefold() for word in query.split() if word.strip()]
+        commands = list(self._commands())
+        if not words:
+            return commands
+        matches = []
+        for command in commands:
+            haystack = " ".join((command.label, *command.keywords)).casefold()
+            if all(word in haystack for word in words):
+                matches.append(command)
+        return matches
+
+    def _execute_command(self, label: str) -> bool:
+        for command in self._commands():
+            if command.label == label:
+                getattr(self, command.method_name)(*command.args)
+                return True
+        return False
+
+    def open_command_palette(self) -> None:
+        palette = tk.Toplevel(self.root)
+        palette.title("Command Palette")
+        palette.geometry("420x360")
+        palette.transient(self.root)
+
+        query = tk.StringVar()
+        entry = ttk.Entry(palette, textvariable=query)
+        entry.pack(fill=tk.X, padx=12, pady=(12, 6))
+
+        listbox = tk.Listbox(palette, exportselection=False, activestyle="dotbox")
+        listbox.pack(fill=tk.BOTH, expand=True, padx=12, pady=(0, 12))
+
+        def refresh() -> None:
+            listbox.delete(0, tk.END)
+            for command in self._matching_commands(query.get()):
+                listbox.insert(tk.END, command.label)
+            if listbox.size():
+                listbox.selection_set(0)
+
+        def run_selected(_event=None) -> None:
+            selection = listbox.curselection()
+            if not selection:
+                return
+            label = listbox.get(selection[0])
+            palette.destroy()
+            self._execute_command(label)
+
+        query.trace_add("write", lambda *_args: refresh())
+        entry.bind("<Return>", run_selected)
+        listbox.bind("<Return>", run_selected)
+        listbox.bind("<Double-Button-1>", run_selected)
+        palette.bind("<Escape>", lambda _event: palette.destroy())
+        refresh()
+        entry.focus_set()
 
     def open_pdf(self) -> None:
         filename = filedialog.askopenfilename(
