@@ -70,9 +70,17 @@ class _FakeStatus:
 class _FakeRoot:
     def __init__(self):
         self.bindings = {}
+        self.after_calls = []
 
     def bind_all(self, sequence, callback):
         self.bindings[sequence] = callback
+
+    def after(self, delay, callback):
+        self.after_calls.append((delay, callback))
+        callback()
+
+    def update_idletasks(self):
+        pass
 
 
 class _FakeDeleteModel:
@@ -223,6 +231,49 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertIn("<Control-z>", app.root.bindings)
         self.assertTrue(app.deleted)
         self.assertTrue(app.exported)
+
+    def test_run_background_sets_and_clears_busy_state(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = _FakeRoot()
+        app.status = _FakeStatus()
+        app._busy = False
+        app.done_value = None
+
+        with patch("epub_layout_gui.threading.Thread") as thread:
+            thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
+            started = app._run_background("Working...", lambda: 42, lambda value: setattr(app, "done_value", value))
+
+        self.assertTrue(started)
+        self.assertFalse(app._busy)
+        self.assertEqual(42, app.done_value)
+        self.assertEqual("Working...", app.status.value)
+
+    def test_run_background_rejects_reentrant_work(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = _FakeRoot()
+        app.status = _FakeStatus()
+        app._busy = True
+
+        started = app._run_background("Working...", lambda: 42, lambda value: None)
+
+        self.assertFalse(started)
+        self.assertEqual("Another operation is already running.", app.status.value)
+
+    def test_open_pdf_uses_background_loader(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app._run_background = lambda status, work, on_success: setattr(app, "background_call", (status, work, on_success)) or True
+
+        with patch("epub_layout_gui.filedialog.askopenfilename", return_value="/tmp/book.pdf"):
+            app.open_pdf()
+
+        self.assertEqual(Path("/tmp/book.pdf"), app.pdf_path)
+        self.assertEqual("Loading PDF images...", app.background_call[0])
+
+    def test_thumbnail_cache_key_uses_stable_entry_identity(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        entry = SimpleNamespace(page=SimpleNamespace(item_id="inserted-0001"), source_index=None)
+
+        self.assertEqual(("entry", "inserted-0001", 100, 200), app._thumbnail_cache_key(entry, 100, 200))
 
     def test_refresh_list_can_preserve_scroll_position(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
@@ -435,9 +486,12 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.batch_project.add_pdf(Path("/tmp/a.pdf"))
         app.batch_list = _FakeListbox(selection=0)
         app.status = _FakeStatus()
+        app.root = _FakeRoot()
 
         with patch("epub_layout_gui.filedialog.askdirectory", return_value="/tmp/out"):
-            app.validate_batch()
+            with patch("epub_layout_gui.threading.Thread") as thread:
+                thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
+                app.validate_batch()
 
         self.assertEqual(Path("/tmp/out"), app.batch_project.validated_dir)
         self.assertEqual(["Ready a.pdf"], app.batch_list.items)
@@ -454,9 +508,12 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.batch_project.validate_all = lambda output_dir: setattr(app.batch_project, "validated_dir", output_dir)
         app.batch_list = _FakeListbox(selection=0)
         app.status = _FakeStatus()
+        app.root = _FakeRoot()
 
         with patch("epub_layout_gui.filedialog.askdirectory", return_value="/tmp/out"):
-            app.validate_batch()
+            with patch("epub_layout_gui.threading.Thread") as thread:
+                thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
+                app.validate_batch()
 
         self.assertEqual("Batch validation complete: 1 ready, 1 warning, 1 failed.", app.status.value)
 

@@ -194,15 +194,15 @@ Files:
 
 Detailed tasks:
 
-- [ ] Move PDF open/load work into a background thread.
-- [ ] Move batch validation into a background thread.
-- [ ] Prevent duplicate long-running actions while a worker is active.
-- [ ] Add a simple busy/status state for long tasks.
-- [ ] Keep all Tkinter UI updates on the main thread via `root.after(...)`.
-- [ ] Cache thumbnails by stable entry identity rather than object identity when possible.
-- [ ] Add tests around worker completion callbacks and busy-state transitions.
-- [ ] Run focused tests, then full verification.
-- [ ] Commit with: `perf: keep layout editor responsive during long tasks`
+- [x] Move PDF open/load work into a background thread.
+- [x] Move batch validation into a background thread.
+- [x] Prevent duplicate long-running actions while a worker is active.
+- [x] Add a simple busy/status state for long tasks.
+- [x] Keep all Tkinter UI updates on the main thread via `root.after(...)`.
+- [x] Cache thumbnails by stable entry identity rather than object identity when possible.
+- [x] Add tests around worker completion callbacks and busy-state transitions.
+- [x] Run focused tests, then full verification.
+- [x] Commit with: `perf: keep layout editor responsive during long tasks`
 
 ## Wave 6 - EPUB Self-Check And Metadata Hygiene
 

@@ -34,6 +34,7 @@ class EpubLayoutApp:
         self.exclude_cover_var = tk.BooleanVar(value=False)
         self.batch_project: BatchProject | None = None
         self.batch_output_dir: Path | None = None
+        self._busy = False
 
         self._build_ui()
         self._bind_shortcuts()
@@ -45,6 +46,32 @@ class EpubLayoutApp:
         self.root.bind_all("<BackSpace>", lambda _event: self.delete_selected_entry())
         self.root.bind_all("<Command-Shift-E>", lambda _event: self.export_selected_images())
         self.root.bind_all("<Control-Shift-E>", lambda _event: self.export_selected_images())
+
+    def _run_background(self, status_message: str, work, on_success) -> bool:
+        if getattr(self, "_busy", False):
+            self.status.set("Another operation is already running.")
+            return False
+        self._busy = True
+        self.status.set(status_message)
+        self.root.update_idletasks()
+
+        def worker() -> None:
+            try:
+                result = work()
+                self.root.after(0, lambda: self._background_done(result, on_success))
+            except Exception as exc:
+                self.root.after(0, lambda: self._background_failed(exc))
+
+        threading.Thread(target=worker, daemon=True).start()
+        return True
+
+    def _background_done(self, result, on_success) -> None:
+        self._busy = False
+        on_success(result)
+
+    def _background_failed(self, exc: Exception) -> None:
+        self._busy = False
+        self._export_failed(exc)
 
     def _build_ui(self) -> None:
         toolbar = ttk.Frame(self.root, padding=8)
@@ -145,22 +172,23 @@ class EpubLayoutApp:
         if not filename:
             return
         self.pdf_path = Path(filename)
-        self.status.set("Loading PDF images...")
-        self.root.update_idletasks()
-        try:
-            self.model = LayoutModel.from_pdf(self.pdf_path)
-            self.deleted_entries.clear()
-            self.thumbnail_cache.clear()
-            self._load_metadata_fields()
-            self.refresh_list()
-            self.page_list.selection_clear(0, tk.END)
-            if self.model.entries:
-                self.page_list.selection_set(0)
-            self.status.set(f"Loaded {self.pdf_path.name}: {len(self.model.entries)} pages")
-            self.refresh_preview()
-        except Exception as exc:
-            messagebox.showerror("Open PDF failed", str(exc))
-            self.status.set("Open PDF failed.")
+        self._run_background(
+            "Loading PDF images...",
+            lambda: LayoutModel.from_pdf(self.pdf_path),
+            self._open_pdf_done,
+        )
+
+    def _open_pdf_done(self, model: LayoutModel) -> None:
+        self.model = model
+        self.deleted_entries.clear()
+        self.thumbnail_cache.clear()
+        self._load_metadata_fields()
+        self.refresh_list()
+        self.page_list.selection_clear(0, tk.END)
+        if self.model.entries:
+            self.page_list.selection_set(0)
+        self.status.set(f"Loaded {self.pdf_path.name}: {len(self.model.entries)} pages")
+        self.refresh_preview()
 
     def refresh_list(self, preserve_yview: bool = False) -> None:
         if self.model is None:
@@ -395,7 +423,17 @@ class EpubLayoutApp:
         output_dir = self._batch_output_dir()
         if output_dir is None:
             return
-        self.batch_project.validate_all(output_dir)
+        self._run_background(
+            "Batch validating...",
+            lambda: self._validate_batch_work(output_dir),
+            lambda _result: self._validate_batch_done(),
+        )
+
+    def _validate_batch_work(self, output_dir: Path) -> None:
+        if self.batch_project is not None:
+            self.batch_project.validate_all(output_dir)
+
+    def _validate_batch_done(self) -> None:
         self.refresh_batch_list()
         self.status.set(self._batch_validation_status())
 
@@ -417,20 +455,13 @@ class EpubLayoutApp:
             self.status.set("Batch export cancelled.")
             return
         target = "all eligible items" if include_warnings else "ready items"
-        self.status.set(f"Batch exporting {target}...")
-        self.root.update_idletasks()
-
-        def worker() -> None:
-            try:
-                if include_warnings:
-                    summary = self.batch_project.export_all(output_dir)
-                else:
-                    summary = self.batch_project.export_ready(output_dir)
-                self.root.after(0, lambda: self._batch_project_done(summary, output_dir))
-            except Exception as exc:
-                self.root.after(0, lambda: self._export_failed(exc))
-
-        threading.Thread(target=worker, daemon=True).start()
+        self._run_background(
+            f"Batch exporting {target}...",
+            lambda: self.batch_project.export_all(output_dir)
+            if include_warnings
+            else self.batch_project.export_ready(output_dir),
+            lambda summary: self._batch_project_done(summary, output_dir),
+        )
 
     def _confirm_batch_overwrites(self) -> bool:
         if self.batch_project is None:
@@ -539,17 +570,11 @@ class EpubLayoutApp:
         if not filename:
             return
         epub_path = Path(filename)
-        self.status.set("Exporting EPUB...")
-        self.root.update_idletasks()
-
-        def worker() -> None:
-            try:
-                counts = self.model.export_epub(epub_path, overwrite=True)
-                self.root.after(0, lambda: self._export_done(epub_path, counts))
-            except Exception as exc:
-                self.root.after(0, lambda: self._export_failed(exc))
-
-        threading.Thread(target=worker, daemon=True).start()
+        self._run_background(
+            "Exporting EPUB...",
+            lambda: self.model.export_epub(epub_path, overwrite=True),
+            lambda counts: self._export_done(epub_path, counts),
+        )
 
     def save_preset(self) -> None:
         if self.model is None:
@@ -612,24 +637,22 @@ class EpubLayoutApp:
             return
         preset_path = Path(preset_name)
         output_dir = Path(output_dir_name)
-        self.status.set("Batch exporting...")
-        self.root.update_idletasks()
+        self._run_background(
+            "Batch exporting...",
+            lambda: self._batch_apply_work(pdf_names, preset_path, output_dir),
+            lambda exported: self._batch_done(len(exported), output_dir),
+        )
 
-        def worker() -> None:
-            try:
-                exported = []
-                for pdf_name in pdf_names:
-                    pdf_path = Path(pdf_name)
-                    model = LayoutModel.from_pdf(pdf_path)
-                    model.apply_preset(preset_path)
-                    epub_path = output_dir / pdf_path.with_suffix(".epub").name
-                    model.export_epub(epub_path, overwrite=True)
-                    exported.append(epub_path.name)
-                self.root.after(0, lambda: self._batch_done(len(exported), output_dir))
-            except Exception as exc:
-                self.root.after(0, lambda: self._export_failed(exc))
-
-        threading.Thread(target=worker, daemon=True).start()
+    def _batch_apply_work(self, pdf_names, preset_path: Path, output_dir: Path) -> list[str]:
+        exported = []
+        for pdf_name in pdf_names:
+            pdf_path = Path(pdf_name)
+            model = LayoutModel.from_pdf(pdf_path)
+            model.apply_preset(preset_path)
+            epub_path = output_dir / pdf_path.with_suffix(".epub").name
+            model.export_epub(epub_path, overwrite=True)
+            exported.append(epub_path.name)
+        return exported
 
     def _batch_done(self, count: int, output_dir: Path) -> None:
         self.status.set(f"Batch exported {count} EPUB files.")
@@ -757,7 +780,7 @@ class EpubLayoutApp:
             return None
 
     def _thumbnail_for_entry(self, entry, max_w: int, max_h: int) -> tk.PhotoImage | None:
-        cache_key = (id(entry), max_w, max_h)
+        cache_key = self._thumbnail_cache_key(entry, max_w, max_h)
         cached = self.thumbnail_cache.get(cache_key)
         if cached is not None:
             return cached
@@ -770,6 +793,16 @@ class EpubLayoutApp:
             return image
         except Exception:
             return None
+
+    def _thumbnail_cache_key(self, entry, max_w: int, max_h: int):
+        source_index = getattr(entry, "source_index", None)
+        if source_index is not None:
+            return ("source", source_index, max_w, max_h)
+        page = getattr(entry, "page", None)
+        item_id = getattr(page, "item_id", None)
+        if item_id is not None:
+            return ("entry", item_id, max_w, max_h)
+        return ("entry", id(entry), max_w, max_h)
 
 
 class _VirtualBlank:
