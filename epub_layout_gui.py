@@ -113,9 +113,11 @@ class EpubLayoutApp:
         ttk.Separator(right).pack(fill=tk.X, pady=16)
         ttk.Label(right, text="Batch project").pack(anchor=tk.W)
         ttk.Button(right, text="Use Current Layout As Template", command=self.use_current_layout_as_batch_template).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Load Template Preset...", command=self.load_batch_template_from_preset).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(right, text="Add PDFs...", command=self.add_batch_pdfs).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(right, text="Validate Batch...", command=self.validate_batch).pack(fill=tk.X, pady=(8, 0))
         ttk.Button(right, text="Export Ready...", command=self.export_ready_batch).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(right, text="Export All...", command=self.export_all_batch).pack(fill=tk.X, pady=(8, 0))
         ttk.Separator(right).pack(fill=tk.X, pady=16)
         ttk.Label(
             right,
@@ -348,6 +350,22 @@ class EpubLayoutApp:
         self.refresh_batch_list()
         self.status.set("Batch template captured from current layout.")
 
+    def load_batch_template_from_preset(self) -> None:
+        filename = filedialog.askopenfilename(
+            title="Load Batch Template Preset",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialdir=str(Path.cwd()),
+        )
+        if not filename:
+            return
+        try:
+            preset_path = Path(filename)
+            self.batch_project = BatchProject.from_preset(preset_path)
+            self.refresh_batch_list()
+            self.status.set(f"Batch template loaded from preset: {preset_path.name}")
+        except Exception as exc:
+            messagebox.showerror("Load batch template failed", str(exc))
+
     def add_batch_pdfs(self) -> None:
         if self.batch_project is None:
             if self.model is None:
@@ -376,22 +394,52 @@ class EpubLayoutApp:
         self.status.set("Batch validation complete.")
 
     def export_ready_batch(self) -> None:
+        self._export_batch(include_warnings=False)
+
+    def export_all_batch(self) -> None:
+        self._export_batch(include_warnings=True)
+
+    def _export_batch(self, include_warnings: bool) -> None:
         if self.batch_project is None:
             return
         output_dir = self._batch_output_dir()
         if output_dir is None:
             return
-        self.status.set("Batch exporting ready items...")
+        self.batch_project.validate_all(output_dir)
+        self.refresh_batch_list()
+        if not self._confirm_batch_overwrites():
+            self.status.set("Batch export cancelled.")
+            return
+        target = "all eligible items" if include_warnings else "ready items"
+        self.status.set(f"Batch exporting {target}...")
         self.root.update_idletasks()
 
         def worker() -> None:
             try:
-                summary = self.batch_project.export_ready(output_dir)
+                if include_warnings:
+                    summary = self.batch_project.export_all(output_dir)
+                else:
+                    summary = self.batch_project.export_ready(output_dir)
                 self.root.after(0, lambda: self._batch_project_done(summary, output_dir))
             except Exception as exc:
                 self.root.after(0, lambda: self._export_failed(exc))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _confirm_batch_overwrites(self) -> bool:
+        if self.batch_project is None:
+            return False
+        existing = [
+            output_path.name
+            for item in self.batch_project.items
+            for output_path in [getattr(item, "output_path", None)]
+            if output_path is not None and output_path.exists() and item.status != "Failed"
+        ]
+        if not existing:
+            return True
+        preview = ", ".join(existing[:5])
+        suffix = "" if len(existing) <= 5 else f", and {len(existing) - 5} more"
+        return messagebox.askyesno("Overwrite EPUB files", f"Replace existing output files: {preview}{suffix}?")
 
     def refresh_batch_list(self) -> None:
         if not hasattr(self, "batch_list"):

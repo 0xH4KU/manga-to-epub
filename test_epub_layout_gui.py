@@ -116,6 +116,7 @@ class _FakeBatchProject:
     def __init__(self):
         self.items = []
         self.validated_dir = None
+        self.exported_all_dir = None
 
     def add_pdf(self, path):
         item = SimpleNamespace(pdf_path=path, status="Pending", warnings=[], error=None)
@@ -128,6 +129,10 @@ class _FakeBatchProject:
             item.status = "Ready"
 
     def export_ready(self, output_dir):
+        return {"exported": len(self.items), "failed": 0, "skipped": 0}
+
+    def export_all(self, output_dir):
+        self.exported_all_dir = output_dir
         return {"exported": len(self.items), "failed": 0, "skipped": 0}
 
 
@@ -412,6 +417,55 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         self.assertEqual(Path("/tmp/out"), app.batch_project.validated_dir)
         self.assertEqual(["Ready a.pdf"], app.batch_list.items)
+
+    def test_load_batch_template_from_preset_creates_batch_project(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.batch_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+
+        with patch("epub_layout_gui.filedialog.askopenfilename", return_value="/tmp/layout.json"):
+            with patch("epub_layout_gui.BatchProject.from_preset", return_value=_FakeBatchProject()) as from_preset:
+                app.load_batch_template_from_preset()
+
+        from_preset.assert_called_once_with(Path("/tmp/layout.json"))
+        self.assertIsInstance(app.batch_project, _FakeBatchProject)
+        self.assertEqual("Batch template loaded from preset: layout.json", app.status.value)
+
+    def test_export_all_batch_uses_warnings_included_export(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.batch_project = _FakeBatchProject()
+        app.batch_project.add_pdf(Path("/tmp/a.pdf"))
+        app.batch_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.root = SimpleNamespace(update_idletasks=lambda: None, after=lambda _delay, callback: callback())
+
+        with patch("epub_layout_gui.filedialog.askdirectory", return_value="/tmp/out"):
+            with patch("epub_layout_gui.threading.Thread") as thread:
+                thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
+                with patch("epub_layout_gui.messagebox.showinfo"):
+                    app.export_all_batch()
+
+        self.assertEqual(Path("/tmp/out"), app.batch_project.exported_all_dir)
+        self.assertEqual("Batch exported 1 EPUB files; 0 failed, 0 skipped.", app.status.value)
+
+    def test_batch_export_confirms_existing_output_files(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.batch_project = _FakeBatchProject()
+        item = app.batch_project.add_pdf(Path("/tmp/a.pdf"))
+        item.output_path = Path("/tmp/out/a.epub")
+        app.batch_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.root = SimpleNamespace(update_idletasks=lambda: None, after=lambda _delay, callback: callback())
+
+        with patch("epub_layout_gui.filedialog.askdirectory", return_value="/tmp/out"):
+            with patch("epub_layout_gui.Path.exists", return_value=True):
+                with patch("epub_layout_gui.messagebox.askyesno", return_value=False) as askyesno:
+                    with patch("epub_layout_gui.messagebox.showinfo"):
+                        app.export_ready_batch()
+
+        askyesno.assert_called_once()
+        self.assertIsNone(app.batch_project.exported_all_dir)
+        self.assertEqual("Batch export cancelled.", app.status.value)
 
     def test_store_metadata_fields_updates_cover_only_option(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

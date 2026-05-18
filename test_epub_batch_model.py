@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from epub_batch_model import BatchProject
@@ -89,6 +90,45 @@ class EpubBatchModelTests(unittest.TestCase):
             self.assertEqual("ja", applied.language)
             self.assertTrue(applied.exclude_cover_from_reading)
             self.assertEqual("inserted-0001", applied.cover_entry_id)
+
+    def test_batch_project_can_be_created_from_v2_preset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            preset_path = Path(tmp) / "layout.json"
+            image_path = Path(tmp) / "cover.png"
+            image_path.write_bytes(_tiny_png())
+            preset_path.write_text(
+                json.dumps(
+                    {
+                        "version": 2,
+                        "source_page_count": 4,
+                        "metadata": {
+                            "title": "Template",
+                            "author": "Author",
+                            "language": "ja",
+                            "exclude_cover_from_reading": True,
+                        },
+                        "cover": {"kind": "inserted", "source_index": None, "entry_id": "inserted-0001"},
+                        "entries": [
+                            {"kind": "source", "source_index": 1},
+                            {"kind": "blank"},
+                            {"kind": "inserted", "path": str(image_path)},
+                            {"kind": "source", "source_index": 4},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            project = BatchProject.from_preset(preset_path)
+
+            self.assertEqual(4, project.template.source_page_count)
+            self.assertEqual([2, 3], project.template.deleted_source_pages)
+            self.assertEqual([1], project.template.blank_positions)
+            self.assertEqual("Author", project.template.author)
+            self.assertEqual("ja", project.template.language)
+            self.assertTrue(project.template.exclude_cover_from_reading)
+            self.assertEqual("inserted-0001", project.template.cover_entry_id)
+            self.assertEqual(4, len(project.template.entries))
 
 
 if __name__ == "__main__":

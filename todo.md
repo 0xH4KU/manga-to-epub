@@ -131,20 +131,20 @@ Files:
 
 Detailed tasks:
 
-- [ ] Teach `LayoutTemplate` to preserve enough v2 preset information for inserted images and cover rules.
-- [ ] Allow creating a `BatchProject` from a saved preset.
-- [ ] Allow exporting/saving a preset from the current batch template if needed by the GUI flow.
-- [ ] Add an `Export All...` GUI action that exports ready and warning items, while still skipping failed items.
-- [ ] Add a preflight warning for output files that already exist before batch export starts.
-- [ ] Keep `Export Ready...` conservative: ready items only.
-- [ ] Keep older `Batch Apply` path available until the new batch-project path covers it fully.
-- [ ] Add tests:
+- [x] Teach `LayoutTemplate` to preserve enough v2 preset information for inserted images and cover rules.
+- [x] Allow creating a `BatchProject` from a saved preset.
+- [x] Allow exporting/saving a preset from the current batch template if needed by the GUI flow.
+- [x] Add an `Export All...` GUI action that exports ready and warning items, while still skipping failed items.
+- [x] Add a preflight warning for output files that already exist before batch export starts.
+- [x] Keep `Export Ready...` conservative: ready items only.
+- [x] Keep older `Batch Apply` path available until the new batch-project path covers it fully.
+- [x] Add tests:
   - batch project from v2 preset applies source deletion, blanks, metadata, and cover.
   - `export_ready` skips warning items.
   - `export_all` exports warning items and skips failed items.
   - output collision warnings remain visible in queue items.
-- [ ] Run focused tests, then full verification.
-- [ ] Commit with: `feat: integrate presets with batch projects`
+- [x] Run focused tests, then full verification.
+- [x] Commit with: `feat: integrate presets with batch projects`
 
 ## Wave 4 - GUI Usability Polish
 

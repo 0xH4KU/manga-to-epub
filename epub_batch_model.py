@@ -57,6 +57,34 @@ class BatchProject:
             )
         )
 
+    @classmethod
+    def from_preset(cls, preset_path: Path) -> "BatchProject":
+        model = LayoutModel(Path(preset_path), [])
+        payload = model.load_preset_payload(preset_path)
+        metadata = payload.get("metadata", {})
+        cover = payload.get("cover", {})
+        deleted_source_pages = _deleted_source_pages_from_entries(
+            int(payload.get("source_page_count", 0)),
+            payload.get("entries", []),
+        )
+        blank_positions = [
+            index for index, entry in enumerate(payload.get("entries", [])) if entry.get("kind") == "blank"
+        ]
+        return cls(
+            LayoutTemplate(
+                source_page_count=int(payload.get("source_page_count", 0)),
+                blank_positions=blank_positions,
+                deleted_source_pages=deleted_source_pages,
+                title=metadata.get("title") or Path(preset_path).stem,
+                author=metadata.get("author") or "",
+                language=metadata.get("language") or "zh-Hant",
+                cover_source_index=cover.get("source_index") if cover.get("kind") == "source" else None,
+                exclude_cover_from_reading=bool(metadata.get("exclude_cover_from_reading", False)),
+                cover_entry_id=cover.get("entry_id") if cover.get("kind") == "inserted" else None,
+                entries=payload.get("entries", []),
+            )
+        )
+
     def add_pdf(self, pdf_path: Path) -> BatchItem:
         item = BatchItem(pdf_path=Path(pdf_path), title=Path(pdf_path).stem)
         self.items.append(item)
@@ -157,3 +185,8 @@ class BatchProject:
         if self.template.cover_source_index is not None:
             return {"kind": "source", "source_index": self.template.cover_source_index, "entry_id": None}
         return {"kind": "first-image", "source_index": None, "entry_id": None}
+
+
+def _deleted_source_pages_from_entries(source_page_count: int, entries: list[dict]) -> list[int]:
+    source_order = {entry.get("source_index") for entry in entries if entry.get("kind") == "source"}
+    return sorted(set(range(1, source_page_count + 1)) - source_order)

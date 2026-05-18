@@ -231,8 +231,11 @@ class LayoutModel:
         preset_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
     def apply_preset(self, preset_path: Path) -> None:
-        payload = json.loads(preset_path.read_text(encoding="utf-8"))
+        payload = self.load_preset_payload(preset_path)
         self.apply_preset_payload(payload)
+
+    def load_preset_payload(self, preset_path: Path) -> dict:
+        return json.loads(preset_path.read_text(encoding="utf-8"))
 
     def apply_preset_payload(self, payload: dict) -> None:
         version = payload.get("version")
