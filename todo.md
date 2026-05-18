@@ -400,3 +400,38 @@ Detailed tasks:
 - [x] All existing layout, preset, batch, export, and validation behavior remains intact.
 - [x] Full verification command passes after every wave.
 - [x] `git log --oneline` shows one commit per UI refresh wave.
+
+## Wave 12 - Inspector Ordering Polish
+
+Purpose: make the inspector controls follow user intent rather than the order they happened to be implemented.
+
+Why this matters: the right panel is now reachable, but some groups still feel awkward. Cover blank shortcuts are insert actions, not delete actions. Batch operations should read as a workflow: create/load template, add files, validate/preflight, then export. The tab strip also needs a bit more space so `Edit`, `Book`, and `Batch` do not visually collide.
+
+Files:
+
+- Modify `epub_layout_gui.py`
+- Test `test_epub_layout_gui.py`
+
+Detailed tasks:
+
+- [x] Add tests for `Edit` inspector section order:
+  - Insert
+  - Delete
+  - Repair
+- [x] Add tests for `Batch` inspector section order:
+  - Template
+  - Queue
+  - Preflight
+  - Export
+- [x] Move `Quick: Blank Before Cover` and `Quick: Blank After Cover` into the `Insert` group, directly after the blank before/after controls.
+- [x] Keep delete-only actions in `Delete`.
+- [x] Move `Recover Last Deleted` and `Normalize Export Order` into `Repair`.
+- [x] Split batch controls into workflow groups:
+  - `Template`: Use Current Layout As Template, Load Template Preset...
+  - `Queue`: Add PDFs...
+  - `Preflight`: Validate Batch...
+  - `Export`: Export Ready..., Export All...
+- [x] Add helper methods for section labels/buttons so spacing is consistent and future ordering is harder to accidentally break.
+- [x] Add a little notebook/tab padding or inspector width room so tab labels do not visually overlap.
+- [x] Run focused GUI tests, then full verification.
+- [x] Commit with: `refactor: polish inspector control ordering`

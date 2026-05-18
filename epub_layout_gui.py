@@ -57,6 +57,14 @@ class EpubLayoutApp:
     def _inspector_tab_titles() -> tuple[str, str, str]:
         return ("Edit", "Book", "Batch")
 
+    @staticmethod
+    def _edit_section_titles() -> tuple[str, str, str]:
+        return ("Insert", "Delete", "Repair")
+
+    @staticmethod
+    def _batch_section_titles() -> tuple[str, str, str, str]:
+        return ("Template", "Queue", "Preflight", "Export")
+
     def _bind_shortcuts(self) -> None:
         self.root.bind_all("<Command-z>", lambda _event: self.recover_last_deleted())
         self.root.bind_all("<Control-z>", lambda _event: self.recover_last_deleted())
@@ -131,7 +139,9 @@ class EpubLayoutApp:
         self.preview.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
         self.preview.bind("<Configure>", lambda _event: self.refresh_preview())
 
-        inspector = ttk.Notebook(main)
+        style = ttk.Style(self.root)
+        style.configure("Workbench.TNotebook.Tab", padding=(18, 5))
+        inspector = ttk.Notebook(main, style="Workbench.TNotebook")
         main.add(inspector, weight=1)
         edit_tab = self._add_inspector_tab(inspector, "Edit")
         book_tab = self._add_inspector_tab(inspector, "Book")
@@ -149,9 +159,11 @@ class EpubLayoutApp:
     def _add_inspector_tab(self, notebook: ttk.Notebook, title: str) -> ttk.Frame:
         outer = ttk.Frame(notebook)
         notebook.add(outer, text=title)
-        canvas = tk.Canvas(outer, highlightthickness=0)
+        outer.configure(width=320)
+        outer.pack_propagate(False)
+        canvas = tk.Canvas(outer, highlightthickness=0, width=300)
         scrollbar = ttk.Scrollbar(outer, orient=tk.VERTICAL, command=canvas.yview)
-        content = ttk.Frame(canvas, padding=8)
+        content = ttk.Frame(canvas, padding=(12, 12))
         window_id = canvas.create_window((0, 0), window=content, anchor=tk.NW)
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -161,38 +173,40 @@ class EpubLayoutApp:
         return content
 
     def _build_edit_tab(self, parent: ttk.Frame) -> None:
-        ttk.Label(parent, text="Insert").pack(anchor=tk.W)
-        ttk.Button(parent, text="Insert Blank Before", command=lambda: self.insert_blank(before=True)).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Insert Blank After", command=lambda: self.insert_blank(before=False)).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Insert Image Before", command=lambda: self.insert_image(before=True)).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Insert Image After", command=lambda: self.insert_image(before=False)).pack(fill=tk.X, pady=(8, 0))
-        ttk.Separator(parent).pack(fill=tk.X, pady=16)
-        ttk.Label(parent, text="Delete").pack(anchor=tk.W)
-        ttk.Button(parent, text="Delete Selected Page", command=self.delete_selected_entry).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Recover Last Deleted", command=self.recover_last_deleted).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Quick: Blank Before Cover", command=self.quick_blank_before_cover).pack(fill=tk.X)
-        ttk.Button(parent, text="Quick: Blank After Cover", command=self.quick_blank_after_cover).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Delete First...", command=self.ask_delete_first).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Delete Last...", command=self.ask_delete_last).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Delete Range...", command=self.ask_delete_range).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Normalize Export Order", command=self.normalize_export_order).pack(fill=tk.X, pady=(8, 0))
+        self._add_section_label(parent, "Insert")
+        self._add_panel_button(parent, "Insert Blank Before", lambda: self.insert_blank(before=True))
+        self._add_panel_button(parent, "Insert Blank After", lambda: self.insert_blank(before=False))
+        self._add_panel_button(parent, "Quick: Blank Before Cover", self.quick_blank_before_cover)
+        self._add_panel_button(parent, "Quick: Blank After Cover", self.quick_blank_after_cover)
+        self._add_panel_button(parent, "Insert Image Before", lambda: self.insert_image(before=True))
+        self._add_panel_button(parent, "Insert Image After", lambda: self.insert_image(before=False))
+        self._add_section_gap(parent)
+        self._add_section_label(parent, "Delete")
+        self._add_panel_button(parent, "Delete Selected Page", self.delete_selected_entry)
+        self._add_panel_button(parent, "Delete First...", self.ask_delete_first)
+        self._add_panel_button(parent, "Delete Last...", self.ask_delete_last)
+        self._add_panel_button(parent, "Delete Range...", self.ask_delete_range)
+        self._add_section_gap(parent)
+        self._add_section_label(parent, "Repair")
+        self._add_panel_button(parent, "Recover Last Deleted", self.recover_last_deleted)
+        self._add_panel_button(parent, "Normalize Export Order", self.normalize_export_order)
 
     def _build_book_tab(self, parent: ttk.Frame) -> None:
-        ttk.Label(parent, text="Metadata").pack(anchor=tk.W)
+        self._add_section_label(parent, "Metadata")
         ttk.Label(parent, text="Title").pack(anchor=tk.W, pady=(8, 0))
         ttk.Entry(parent, textvariable=self.title_var).pack(fill=tk.X)
         ttk.Label(parent, text="Author").pack(anchor=tk.W, pady=(8, 0))
         ttk.Entry(parent, textvariable=self.author_var).pack(fill=tk.X)
         ttk.Label(parent, text="Language").pack(anchor=tk.W, pady=(8, 0))
         ttk.Entry(parent, textvariable=self.language_var).pack(fill=tk.X)
-        ttk.Button(parent, text="Set Selected As Cover", command=self.set_selected_as_cover).pack(fill=tk.X, pady=(8, 0))
+        self._add_panel_button(parent, "Set Selected As Cover", self.set_selected_as_cover)
         ttk.Checkbutton(
             parent,
             text="Cover only, exclude from pages",
             variable=self.exclude_cover_var,
         ).pack(anchor=tk.W, pady=(8, 0))
-        ttk.Button(parent, text="Export Selected Images...", command=self.export_selected_images).pack(fill=tk.X, pady=(8, 0))
-        ttk.Separator(parent).pack(fill=tk.X, pady=16)
+        self._add_panel_button(parent, "Export Selected Images...", self.export_selected_images)
+        self._add_section_gap(parent)
         ttk.Label(
             parent,
             text=(
@@ -205,13 +219,28 @@ class EpubLayoutApp:
         ).pack(anchor=tk.W)
 
     def _build_batch_tab(self, parent: ttk.Frame) -> None:
-        ttk.Label(parent, text="Batch project").pack(anchor=tk.W)
-        ttk.Button(parent, text="Use Current Layout As Template", command=self.use_current_layout_as_batch_template).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Load Template Preset...", command=self.load_batch_template_from_preset).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Add PDFs...", command=self.add_batch_pdfs).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Validate Batch...", command=self.validate_batch).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Export Ready...", command=self.export_ready_batch).pack(fill=tk.X, pady=(8, 0))
-        ttk.Button(parent, text="Export All...", command=self.export_all_batch).pack(fill=tk.X, pady=(8, 0))
+        self._add_section_label(parent, "Template")
+        self._add_panel_button(parent, "Use Current Layout As Template", self.use_current_layout_as_batch_template)
+        self._add_panel_button(parent, "Load Template Preset...", self.load_batch_template_from_preset)
+        self._add_section_gap(parent)
+        self._add_section_label(parent, "Queue")
+        self._add_panel_button(parent, "Add PDFs...", self.add_batch_pdfs)
+        self._add_section_gap(parent)
+        self._add_section_label(parent, "Preflight")
+        self._add_panel_button(parent, "Validate Batch...", self.validate_batch)
+        self._add_section_gap(parent)
+        self._add_section_label(parent, "Export")
+        self._add_panel_button(parent, "Export Ready...", self.export_ready_batch)
+        self._add_panel_button(parent, "Export All...", self.export_all_batch)
+
+    def _add_section_label(self, parent: ttk.Frame, text: str) -> None:
+        ttk.Label(parent, text=text).pack(anchor=tk.W, pady=(0, 4))
+
+    def _add_section_gap(self, parent: ttk.Frame) -> None:
+        ttk.Separator(parent).pack(fill=tk.X, pady=14)
+
+    def _add_panel_button(self, parent: ttk.Frame, text: str, command) -> None:
+        ttk.Button(parent, text=text, command=command).pack(fill=tk.X, pady=(6, 0))
 
     def _commands(self) -> tuple[AppCommand, ...]:
         return (

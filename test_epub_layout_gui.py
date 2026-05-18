@@ -241,6 +241,12 @@ class EpubLayoutGuiListTests(unittest.TestCase):
     def test_inspector_tabs_group_workbench_controls(self):
         self.assertEqual(("Edit", "Book", "Batch"), EpubLayoutApp._inspector_tab_titles())
 
+    def test_edit_inspector_sections_follow_layout_workflow(self):
+        self.assertEqual(("Insert", "Delete", "Repair"), EpubLayoutApp._edit_section_titles())
+
+    def test_batch_inspector_sections_follow_batch_workflow(self):
+        self.assertEqual(("Template", "Queue", "Preflight", "Export"), EpubLayoutApp._batch_section_titles())
+
     def test_bind_shortcuts_registers_safe_layout_actions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.root = _FakeRoot()
