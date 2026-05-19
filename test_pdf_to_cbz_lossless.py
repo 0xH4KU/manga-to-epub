@@ -7,7 +7,14 @@ from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 from unittest.mock import patch
 
-from pdf_to_cbz_lossless import PdfImageError, convert_pdf_to_cbz, flate_image_to_png, images_in_pdf_page_order, iter_image_streams
+from pdf_to_cbz_lossless import (
+    PdfImageError,
+    _image_from_xref,
+    convert_pdf_to_cbz,
+    flate_image_to_png,
+    images_in_pdf_page_order,
+    iter_image_streams,
+)
 
 
 def _png_predict_none(rows):
@@ -131,6 +138,35 @@ class PdfToCbzLosslessTests(unittest.TestCase):
             with patch("pdf_to_cbz_lossless._load_fitz", return_value=None):
                 with self.assertRaisesRegex(PdfImageError, "PyMuPDF is required"):
                     images_in_pdf_page_order(pdf_path)
+
+    def test_named_jbig2_filter_falls_back_to_decoded_png_image(self):
+        class FakeDoc:
+            def xref_get_key(self, _xref, key):
+                values = {
+                    "Subtype": ("name", "/Image"),
+                    "Filter": ("name", "/JBIG2Decode"),
+                }
+                return values.get(key, ("null", "null"))
+
+            def extract_image(self, xref):
+                self.extracted_xref = xref
+                return {
+                    "ext": "png",
+                    "width": 2,
+                    "height": 3,
+                    "image": b"PNG-DATA",
+                }
+
+        doc = FakeDoc()
+
+        image = _image_from_xref(doc, xref=351, index=7)
+
+        self.assertEqual(351, doc.extracted_xref)
+        self.assertEqual("PNG", image.filter_name)
+        self.assertEqual(7, image.index)
+        self.assertEqual(2, image.width)
+        self.assertEqual(3, image.height)
+        self.assertEqual(b"PNG-DATA", image.data)
 
     def test_flate_indexed_png_predictor_image_is_wrapped_as_png(self):
         rows = [bytes([0x12]), bytes([0x34])]

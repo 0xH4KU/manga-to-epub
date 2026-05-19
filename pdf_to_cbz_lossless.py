@@ -550,7 +550,28 @@ def _image_from_xref(doc, xref: int, index: int) -> ImageStream | None:
             xref=xref,
         )
 
+    if filter_name in {"JBIG2Decode"}:
+        return _decoded_image_from_xref(doc, xref, index)
+
     raise PdfImageError(f"Unsupported image filter for xref {xref}: {filter_name}")
+
+
+def _decoded_image_from_xref(doc, xref: int, index: int) -> ImageStream:
+    extracted = doc.extract_image(xref)
+    ext = extracted["ext"]
+    if ext != "png":
+        raise PdfImageError(f"Unsupported extracted image extension for xref {xref}: {ext}")
+    return ImageStream(
+        index=index,
+        width=extracted["width"],
+        height=extracted["height"],
+        bits_per_component=8,
+        color_space=b"/DeviceRGB",
+        filter_name="PNG",
+        decode_parms=None,
+        data=extracted["image"],
+        xref=xref,
+    )
 
 
 def _xref_required_int(doc, xref: int, key: str) -> int:
