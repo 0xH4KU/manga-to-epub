@@ -456,6 +456,130 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertIn("Queue", parent_labels)
         self.assertIn("Add PDFs...", parent_labels)
 
+    def test_import_series_toolbar_and_series_list_are_visible(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = _FakeRoot()
+        app.apple_preview = _FakeBool(True)
+        app.title_var = SimpleNamespace()
+        app.author_var = SimpleNamespace()
+        app.language_var = SimpleNamespace()
+        app.exclude_cover_var = _FakeBool(False)
+        app.inspector_tabs = {}
+        app.inspector_tab_buttons = {}
+        app.status = _FakeStatus()
+        app.workspace_status = _FakeStatus()
+        app.refresh_preview = lambda: None
+        app.refresh_workspace_status = lambda: None
+        widgets = []
+
+        class FakeFrame(_FakeWidget):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.options = kwargs
+                widgets.append(self)
+
+        class FakePanedwindow(FakeFrame):
+            pass
+
+        class FakeButton(FakeFrame):
+            pass
+
+        class FakeLabel(FakeFrame):
+            pass
+
+        class FakeCheckbutton(FakeFrame):
+            pass
+
+        class FakeListbox(FakeFrame):
+            def bind(self, *_args, **_kwargs):
+                pass
+
+            def yview(self, *_args, **_kwargs):
+                pass
+
+        class FakeCanvas(FakeListbox):
+            def create_window(self, *_args, **_kwargs):
+                return 1
+
+            def itemconfigure(self, *_args, **_kwargs):
+                pass
+
+            def bbox(self, *_args, **_kwargs):
+                return (0, 0, 1, 1)
+
+        with patch("epub_layout_gui.ttk.Frame", FakeFrame), \
+            patch("epub_layout_gui.ttk.Panedwindow", FakePanedwindow), \
+            patch("epub_layout_gui.ttk.Button", FakeButton), \
+            patch("epub_layout_gui.ttk.Label", FakeLabel), \
+            patch("epub_layout_gui.ttk.Checkbutton", FakeCheckbutton), \
+            patch("epub_layout_gui.ttk.Scrollbar", FakeButton), \
+            patch("epub_layout_gui.ttk.Separator", FakeButton), \
+            patch("epub_layout_gui.ttk.Entry", FakeButton), \
+            patch("epub_layout_gui.tk.Listbox", FakeListbox), \
+            patch("epub_layout_gui.tk.Canvas", FakeCanvas):
+            app._build_ui()
+
+        labels = [widget.options.get("text") for widget in widgets]
+        self.assertIn("Import Series...", labels)
+        self.assertIn("Series volumes", labels)
+        self.assertIsNot(app.series_list, app.page_list)
+
+    def test_import_series_creates_project_and_populates_volume_list(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.series_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.workspace_status = _FakeStatus()
+        app.refresh_workspace_status = lambda: None
+
+        with patch(
+            "epub_layout_gui.filedialog.askopenfilenames",
+            return_value=("/tmp/晚安,布布 淺野一二O Vol.02.pdf", "/tmp/晚安,布布 淺野一二O Vol.01.pdf"),
+        ):
+            app.import_series()
+
+        self.assertEqual("晚安,布布 淺野一二O", app.series_project.title)
+        self.assertEqual(
+            [
+                "Unreviewed Vol.01 晚安,布布 淺野一二O Vol.01.pdf",
+                "Unreviewed Vol.02 晚安,布布 淺野一二O Vol.02.pdf",
+            ],
+            app.series_list.items,
+        )
+        self.assertEqual("Imported series with 2 volumes.", app.status.value)
+
+    def test_select_series_volume_loads_existing_editor_model(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        first = SimpleNamespace(
+            pdf_path=Path("/tmp/vol01.pdf"),
+            volume_number=1,
+            status="Unreviewed",
+            layout_model=_FakeDeleteModel([_entry("Page 1")]),
+        )
+        project = SimpleNamespace(
+            volumes=[first],
+            generated_title=lambda volume: f"Series Vol.{volume.volume_number:02d}",
+            model_for_volume=lambda volume: volume.layout_model,
+        )
+        app.series_project = project
+        app.series_list = _FakeListbox(selection=0)
+        app.page_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.deleted_entries = []
+        app.thumbnail_cache = {}
+        app._load_metadata_fields = lambda: setattr(app, "metadata_loaded", True)
+        app.refresh_list = lambda: setattr(app, "list_refreshed", True)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+        app.refresh_workspace_status = lambda: None
+
+        app.select_series_volume()
+
+        self.assertIs(first.layout_model, app.model)
+        self.assertEqual(Path("/tmp/vol01.pdf"), app.pdf_path)
+        self.assertTrue(app.metadata_loaded)
+        self.assertTrue(app.list_refreshed)
+        self.assertTrue(app.preview_refreshed)
+        self.assertEqual("Loaded Series Vol.01.", app.status.value)
+
     def test_bind_shortcuts_registers_safe_layout_actions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.root = _FakeRoot()

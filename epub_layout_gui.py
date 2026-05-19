@@ -13,6 +13,7 @@ import fitz
 
 from epub_batch_model import BatchProject
 from epub_layout_model import LayoutEntry, LayoutModel
+from epub_series_model import SeriesProject, SeriesVolume
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class EpubLayoutApp:
         self.exclude_cover_var = tk.BooleanVar(value=False)
         self.batch_project: BatchProject | None = None
         self.batch_output_dir: Path | None = None
+        self.series_project: SeriesProject | None = None
         self._busy = False
         self._page_drag_source: int | None = None
 
@@ -111,6 +113,7 @@ class EpubLayoutApp:
     def _build_ui(self) -> None:
         toolbar = ttk.Frame(self.root, padding=8)
         toolbar.pack(side=tk.TOP, fill=tk.X)
+        ttk.Button(toolbar, text="Import Series...", command=self.import_series).pack(side=tk.LEFT)
         ttk.Button(toolbar, text="Open PDF", command=self.open_pdf).pack(side=tk.LEFT)
         ttk.Button(toolbar, text="Export EPUB", command=self.export_epub).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(toolbar, text="Save Preset", command=self.save_preset).pack(side=tk.LEFT, padx=(8, 0))
@@ -122,6 +125,11 @@ class EpubLayoutApp:
 
         left = ttk.Frame(main, padding=8)
         main.add(left, weight=1)
+        ttk.Label(left, text="Series volumes").pack(anchor=tk.W)
+        self.series_list = tk.Listbox(left, exportselection=False, height=8)
+        self.series_list.pack(fill=tk.X, pady=(6, 12))
+        self.series_list.bind("<<ListboxSelect>>", lambda _event: self.select_series_volume())
+        ttk.Separator(left).pack(fill=tk.X, pady=(0, 12))
         ttk.Label(left, text="Spine order").pack(anchor=tk.W)
         self.page_list = tk.Listbox(left, exportselection=False, activestyle="dotbox", selectmode=tk.EXTENDED)
         self.page_list.pack(fill=tk.BOTH, expand=True, pady=(6, 12))
@@ -263,6 +271,7 @@ class EpubLayoutApp:
     def _commands(self) -> tuple[AppCommand, ...]:
         return (
             AppCommand("Open PDF", "open_pdf", keywords=("import", "load")),
+            AppCommand("Import Series", "import_series", keywords=("folder", "volumes")),
             AppCommand("Export EPUB", "export_epub", keywords=("save",)),
             AppCommand("Save Preset", "save_preset", keywords=("layout",)),
             AppCommand("Load Preset", "load_preset", keywords=("layout",)),
@@ -372,6 +381,60 @@ class EpubLayoutApp:
             lambda: LayoutModel.from_pdf(self.pdf_path),
             self._open_pdf_done,
         )
+
+    def import_series(self) -> None:
+        filenames = filedialog.askopenfilenames(
+            title="Import Series PDFs",
+            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+            initialdir=str(Path.cwd()),
+        )
+        if not filenames:
+            return
+        self.series_project = SeriesProject.from_pdfs([Path(filename) for filename in filenames])
+        self.refresh_series_list()
+        self.status.set(f"Imported series with {len(self.series_project.volumes)} volumes.")
+        self.refresh_workspace_status()
+
+    def refresh_series_list(self) -> None:
+        if not hasattr(self, "series_list"):
+            return
+        self.series_list.delete(0, tk.END)
+        if self.series_project is None:
+            return
+        for volume in self.series_project.volumes:
+            self.series_list.insert(
+                tk.END,
+                f"{volume.status} Vol.{volume.volume_number:02d} {volume.pdf_path.name}",
+            )
+
+    def select_series_volume(self) -> None:
+        if self.series_project is None or not hasattr(self, "series_list"):
+            return
+        selection = self.series_list.curselection()
+        if not selection:
+            return
+        volume = self.series_project.volumes[selection[0]]
+        try:
+            self._load_series_volume(volume)
+        except Exception as exc:
+            volume.status = "Failed"
+            volume.error = str(exc)
+            self.refresh_series_list()
+            messagebox.showerror("Load series volume failed", str(exc))
+
+    def _load_series_volume(self, volume: SeriesVolume) -> None:
+        self.pdf_path = volume.pdf_path
+        self.model = self.series_project.model_for_volume(volume) if self.series_project is not None else None
+        self.deleted_entries.clear()
+        self.thumbnail_cache.clear()
+        self._load_metadata_fields()
+        self.refresh_list()
+        self.page_list.selection_clear(0, tk.END)
+        if self.model is not None and self.model.entries:
+            self.page_list.selection_set(0)
+        self.status.set(f"Loaded {self.series_project.generated_title(volume)}.")
+        self.refresh_workspace_status()
+        self.refresh_preview()
 
     def _open_pdf_done(self, model: LayoutModel) -> None:
         self.model = model
