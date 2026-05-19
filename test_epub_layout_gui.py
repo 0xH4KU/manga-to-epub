@@ -178,6 +178,9 @@ class _FakeDeleteModel:
     def insert_image(self, index, image_path):
         self.entries.insert(index, _entry(f"Image {index + 1}"))
 
+    def insert_blank(self, index):
+        self.entries.insert(index, _entry(f"Blank {index + 1}", is_blank=True))
+
     def export_selected_images(self, indexes, output_dir):
         return [output_dir / f"{index + 1:04d}.jpg" for index in indexes], 0
 
@@ -632,6 +635,7 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         self.assertIs(first.layout_model, app.model)
         self.assertEqual(Path("/tmp/vol01.pdf"), app.pdf_path)
+        self.assertIs(first, app.active_series_volume)
         self.assertTrue(app.metadata_loaded)
         self.assertTrue(app.list_refreshed)
         self.assertTrue(app.preview_refreshed)
@@ -893,6 +897,58 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertTrue(app.preserved_yview)
         self.assertTrue(app.preview_refreshed)
         self.assertEqual("Removed Blank 1 from layout.", app.status.value)
+
+    def test_insert_blank_marks_active_series_volume_edited(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1")])
+        volume = SimpleNamespace(status="Unreviewed", volume_number=1)
+        app.active_series_volume = volume
+        app.series_project = SimpleNamespace(volumes=[volume])
+        app.series_list = _FakeListbox(selection=0)
+        app.page_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+        app.refresh_series_list = lambda: setattr(app, "series_refreshed", True)
+        app.refresh_workspace_status = lambda: setattr(app, "workspace_refreshed", True)
+
+        app.insert_blank(before=False)
+
+        self.assertEqual("Edited", volume.status)
+        self.assertTrue(app.series_refreshed)
+        self.assertTrue(app.workspace_refreshed)
+
+    def test_insert_blank_in_single_pdf_mode_does_not_require_series_state(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1")])
+        app.page_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        app.insert_blank(before=False)
+
+        self.assertEqual(["Page 1", "Blank 2"], [entry.label for entry in app.model.entries])
+        self.assertFalse(hasattr(app, "series_refreshed"))
+
+    def test_set_selected_as_cover_marks_ready_series_volume_edited(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2")])
+        volume = SimpleNamespace(status="Ready", volume_number=1)
+        app.active_series_volume = volume
+        app.series_project = SimpleNamespace(volumes=[volume])
+        app.series_list = _FakeListbox(selection=0)
+        app.page_list = _FakeListbox(selection=1)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_series_list = lambda: setattr(app, "series_refreshed", True)
+        app.refresh_workspace_status = lambda: setattr(app, "workspace_refreshed", True)
+
+        app.set_selected_as_cover()
+
+        self.assertEqual("Edited", volume.status)
+        self.assertTrue(app.series_refreshed)
+        self.assertTrue(app.workspace_refreshed)
 
     def test_delete_selected_entry_confirms_real_pages(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

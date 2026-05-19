@@ -545,6 +545,7 @@ class EpubLayoutApp:
             self.page_list.selection_set(final_index)
             self.refresh_preview()
             self.status.set(f"Moved {label} to position {final_index + 1}.")
+            self._mark_active_volume_edited()
         except Exception as exc:
             messagebox.showerror("Move page failed", str(exc))
 
@@ -562,6 +563,7 @@ class EpubLayoutApp:
             self.page_list.selection_set(index)
             self.refresh_preview()
             self.status.set(f"Inserted blank page at position {index + 1}.")
+            self._mark_active_volume_edited()
         except Exception as exc:
             messagebox.showerror("Insert blank failed", str(exc))
 
@@ -586,6 +588,7 @@ class EpubLayoutApp:
             self.page_list.selection_set(index)
             self.refresh_preview()
             self.status.set(f"Inserted image: {Path(filename).name}")
+            self._mark_active_volume_edited()
         except Exception as exc:
             messagebox.showerror("Insert image failed", str(exc))
 
@@ -606,6 +609,7 @@ class EpubLayoutApp:
                 self.page_list.selection_set(min(index, len(self.model.entries) - 1))
             self.refresh_preview()
             self.status.set(f"Removed {entry.label} from layout.")
+            self._mark_active_volume_edited()
         except Exception as exc:
             messagebox.showerror("Delete page failed", str(exc))
 
@@ -622,6 +626,7 @@ class EpubLayoutApp:
         self.page_list.selection_clear(0, tk.END)
         self.page_list.selection_set(restored_indexes[0])
         self.refresh_preview()
+        self._mark_active_volume_edited()
         if len(group) == 1:
             entry = group[0][1]
             self.status.set(f"Recovered {entry.label} at position {restored_indexes[0] + 1}.")
@@ -637,6 +642,7 @@ class EpubLayoutApp:
         self.page_list.selection_set(0)
         self.refresh_preview()
         self.status.set("Inserted one blank page before cover.")
+        self._mark_active_volume_edited()
 
     def quick_blank_after_cover(self) -> None:
         if self.model is None:
@@ -647,6 +653,7 @@ class EpubLayoutApp:
         self.page_list.selection_set(1)
         self.refresh_preview()
         self.status.set("Inserted one blank page after cover.")
+        self._mark_active_volume_edited()
 
     def ask_delete_first(self) -> None:
         count = self._ask_positive_integer("Delete first pages", "How many pages from the start?")
@@ -695,6 +702,7 @@ class EpubLayoutApp:
             self.model.set_cover_entry(entry)
             self.refresh_list(preserve_yview=True)
             self.status.set(f"Set {entry.label} as cover.")
+            self._mark_active_volume_edited()
         except Exception as exc:
             messagebox.showerror("Set cover failed", str(exc))
 
@@ -738,8 +746,32 @@ class EpubLayoutApp:
                 self.page_list.selection_set(min(first_deleted, len(self.model.entries) - 1))
             self.refresh_preview()
             self.status.set(_delete_status(deleted, status_message))
+            self._mark_active_volume_edited()
         except Exception as exc:
             messagebox.showerror("Delete pages failed", str(exc))
+
+    def _mark_active_volume_edited(self) -> None:
+        volume = getattr(self, "active_series_volume", None)
+        if getattr(self, "series_project", None) is None or volume is None:
+            return
+        volume.status = "Edited"
+        volume.error = None
+        self.refresh_series_list()
+        self._restore_active_series_selection()
+        self.refresh_workspace_status()
+
+    def _restore_active_series_selection(self) -> None:
+        if self.series_project is None or not hasattr(self, "series_list"):
+            return
+        volume = getattr(self, "active_series_volume", None)
+        if volume is None:
+            return
+        try:
+            index = self.series_project.volumes.index(volume)
+        except ValueError:
+            return
+        self.series_list.selection_clear(0, tk.END)
+        self.series_list.selection_set(index)
 
     def _ask_positive_integer(self, title: str, prompt: str) -> int | None:
         return simpledialog.askinteger(title, prompt, minvalue=1, parent=self.root)
