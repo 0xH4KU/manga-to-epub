@@ -67,11 +67,6 @@ def _extract_int(dictionary: bytes, key: bytes) -> int | None:
     return int(match.group(1)) if match else None
 
 
-def _extract_name(dictionary: bytes, key: bytes) -> str | None:
-    match = re.search(rb"/" + re.escape(key) + rb"\s*/([A-Za-z0-9]+)", dictionary)
-    return match.group(1).decode("ascii") if match else None
-
-
 def _extract_object(dictionary: bytes, key: bytes) -> bytes | None:
     match = re.search(rb"/" + re.escape(key) + rb"\s*", dictionary)
     if not match:

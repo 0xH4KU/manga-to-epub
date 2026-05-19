@@ -80,18 +80,19 @@ class EpubLayoutModelTests(unittest.TestCase):
                 self.assertLess(opf.index('idref="page-0001"'), opf.index('idref="blank-0001"'))
                 self.assertLess(opf.index('idref="blank-0001"'), opf.index('idref="page-0003"'))
 
-    def test_deletes_only_blank_entries(self):
+    def test_deletes_blank_entries_through_general_delete_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             pdf_path = Path(tmp) / "comic.pdf"
             pdf_path.write_bytes(_two_page_pdf_with_late_cover())
             model = LayoutModel.from_pdf(pdf_path)
 
             model.insert_blank(0)
-            model.delete_blank(0)
+            model.delete_entry(0)
 
             self.assertEqual(["Page 1", "Page 2"], [entry.label for entry in model.entries])
-            with self.assertRaises(ValueError):
-                model.delete_blank(0)
+
+    def test_blank_only_delete_api_is_removed(self):
+        self.assertFalse(hasattr(LayoutModel, "delete_blank"))
 
     def test_delete_entry_can_remove_source_pages_and_export_without_them(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -102,13 +102,6 @@ class LayoutModel:
         )
         self.entries.insert(index, LayoutEntry(image_path.stem, page, inserted_path=image_path))
 
-    def delete_blank(self, index: int) -> None:
-        if index < 0 or index >= len(self.entries):
-            raise IndexError("Blank deletion index out of range")
-        if not self.entries[index].is_blank:
-            raise ValueError("Only blank pages can be deleted")
-        del self.entries[index]
-
     def delete_entry(self, index: int) -> None:
         if index < 0 or index >= len(self.entries):
             raise IndexError("Deletion index out of range")
