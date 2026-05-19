@@ -33,6 +33,28 @@ class EpubSeriesModelTests(unittest.TestCase):
             self.assertEqual("淺野一二O", project.author)
             self.assertEqual("ja", project.language)
 
+    def test_import_pdfs_infers_bracketed_series_title_and_author(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "[晚安,布布][淺野一二O] Vol.09.pdf"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+
+            project = SeriesProject.from_pdfs([pdf_path])
+
+            self.assertEqual("晚安,布布", project.title)
+            self.assertEqual("淺野一二O", project.author)
+            self.assertEqual("晚安,布布 Vol.09", project.generated_title(project.volumes[0]))
+
+    def test_import_pdfs_infers_plain_series_title_and_author_when_title_has_comma(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "晚安,布布 淺野一二O Vol.01.pdf"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+
+            project = SeriesProject.from_pdfs([pdf_path])
+
+            self.assertEqual("晚安,布布", project.title)
+            self.assertEqual("淺野一二O", project.author)
+            self.assertEqual("晚安,布布 Vol.01", project.generated_title(project.volumes[0]))
+
     def test_import_pdfs_uses_sorted_position_when_volume_token_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             first = Path(tmp) / "Series c.pdf"

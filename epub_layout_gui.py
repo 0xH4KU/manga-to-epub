@@ -40,8 +40,11 @@ class EpubLayoutApp:
         self.title_var = tk.StringVar(value="")
         self.author_var = tk.StringVar(value="")
         self.language_var = tk.StringVar(value="zh-Hant")
+        self.title_label_var = tk.StringVar(value="Title")
+        self.author_label_var = tk.StringVar(value="Author")
         self.exclude_cover_var = tk.BooleanVar(value=False)
         self.series_project: SeriesProject | None = None
+        self.active_series_volume: SeriesVolume | None = None
         self._busy = False
         self._page_drag_source: int | None = None
 
@@ -64,6 +67,12 @@ class EpubLayoutApp:
     @staticmethod
     def _series_section_titles() -> tuple[str, str]:
         return ("Review", "Export")
+
+    @staticmethod
+    def _metadata_label_texts(series_mode: bool) -> tuple[str, str]:
+        if series_mode:
+            return ("Series Title", "Series Author")
+        return ("Title", "Author")
 
     def _bind_shortcuts(self) -> None:
         self.root.bind_all("<Command-z>", lambda _event: self.recover_last_deleted())
@@ -225,10 +234,11 @@ class EpubLayoutApp:
         self._add_panel_button(parent, "Recover Last Deleted", self.recover_last_deleted)
 
     def _build_book_tab(self, parent: ttk.Frame) -> None:
+        self._ensure_metadata_label_vars()
         self._add_section_label(parent, "Metadata")
-        ttk.Label(parent, text="Title").pack(anchor=tk.W, pady=(8, 0))
+        ttk.Label(parent, textvariable=self.title_label_var).pack(anchor=tk.W, pady=(8, 0))
         ttk.Entry(parent, textvariable=self.title_var).pack(fill=tk.X)
-        ttk.Label(parent, text="Author").pack(anchor=tk.W, pady=(8, 0))
+        ttk.Label(parent, textvariable=self.author_label_var).pack(anchor=tk.W, pady=(8, 0))
         ttk.Entry(parent, textvariable=self.author_var).pack(fill=tk.X)
         ttk.Label(parent, text="Language").pack(anchor=tk.W, pady=(8, 0))
         ttk.Entry(parent, textvariable=self.language_var).pack(fill=tk.X)
@@ -378,6 +388,7 @@ class EpubLayoutApp:
         if not filenames:
             return
         self.series_project = SeriesProject.from_pdfs([Path(filename) for filename in filenames])
+        self._load_metadata_fields()
         self.refresh_series_list()
         self.status.set(f"Imported series with {len(self.series_project.volumes)} volumes.")
         self.refresh_workspace_status()
@@ -442,6 +453,7 @@ class EpubLayoutApp:
     def _load_series_volume(self, volume: SeriesVolume) -> None:
         self.pdf_path = volume.pdf_path
         self.model = self.series_project.model_for_volume(volume) if self.series_project is not None else None
+        self.active_series_volume = volume
         self.deleted_entries.clear()
         self.thumbnail_cache.clear()
         self._load_metadata_fields()
@@ -455,6 +467,8 @@ class EpubLayoutApp:
 
     def _open_pdf_done(self, model: LayoutModel) -> None:
         self.model = model
+        self.series_project = None
+        self.active_series_volume = None
         self.deleted_entries.clear()
         self.thumbnail_cache.clear()
         self._load_metadata_fields()
@@ -780,19 +794,62 @@ class EpubLayoutApp:
 
     def _load_metadata_fields(self) -> None:
         if self.model is None:
-            return
-        self.title_var.set(self.model.title)
-        self.author_var.set(self.model.author)
-        self.language_var.set(self.model.language)
-        self.exclude_cover_var.set(self.model.exclude_cover_from_reading)
+            if self.series_project is None:
+                return
+            title = self.series_project.title
+            author = self.series_project.author
+            language = self.series_project.language
+            exclude_cover = False
+        elif self.series_project is not None:
+            title = self.series_project.title
+            author = self.series_project.author
+            language = self.series_project.language
+            exclude_cover = self.model.exclude_cover_from_reading
+        else:
+            title = self.model.title
+            author = self.model.author
+            language = self.model.language
+            exclude_cover = self.model.exclude_cover_from_reading
+        self._sync_metadata_label_texts()
+        self.title_var.set(title)
+        self.author_var.set(author)
+        self.language_var.set(language)
+        self.exclude_cover_var.set(exclude_cover)
 
     def _store_metadata_fields(self) -> None:
         if self.model is None:
             return
-        self.model.title = self.title_var.get().strip() or self.model.source_path.stem
-        self.model.author = self.author_var.get().strip()
-        self.model.language = self.language_var.get().strip() or "zh-Hant"
+        title = self.title_var.get().strip()
+        author = self.author_var.get().strip()
+        language = self.language_var.get().strip() or "zh-Hant"
+        if self.series_project is not None:
+            self.series_project.title = title or self.series_project.title
+            self.series_project.author = author
+            self.series_project.language = language
+            active_volume = getattr(self, "active_series_volume", None)
+            if active_volume is not None and hasattr(self.series_project, "generated_title"):
+                self.model.title = self.series_project.generated_title(active_volume)
+            self.model.author = self.series_project.author
+            self.model.language = self.series_project.language
+        else:
+            self.model.title = title or self.model.source_path.stem
+            self.model.author = author
+            self.model.language = language
         self.model.exclude_cover_from_reading = self.exclude_cover_var.get()
+
+    def _sync_metadata_label_texts(self) -> None:
+        self._ensure_metadata_label_vars()
+        title_label, author_label = self._metadata_label_texts(self.series_project is not None)
+        if hasattr(self, "title_label_var"):
+            self.title_label_var.set(title_label)
+        if hasattr(self, "author_label_var"):
+            self.author_label_var.set(author_label)
+
+    def _ensure_metadata_label_vars(self) -> None:
+        if not hasattr(self, "title_label_var"):
+            self.title_label_var = _PlainTextVariable("Title")
+        if not hasattr(self, "author_label_var"):
+            self.author_label_var = _PlainTextVariable("Author")
 
     def _is_cover_entry(self, entry: LayoutEntry) -> bool:
         if self.model is None:
@@ -929,6 +986,17 @@ class _VirtualBlank:
     def __init__(self, label: str):
         self.label = label
         self.is_blank = True
+
+
+class _PlainTextVariable:
+    def __init__(self, value: str):
+        self.value = value
+
+    def set(self, value: str) -> None:
+        self.value = value
+
+    def get(self) -> str:
+        return self.value
 
 
 def _event_from_text_input(event) -> bool:

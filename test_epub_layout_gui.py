@@ -264,6 +264,10 @@ class EpubLayoutGuiListTests(unittest.TestCase):
     def test_series_inspector_sections_follow_series_workflow(self):
         self.assertEqual(("Review", "Export"), EpubLayoutApp._series_section_titles())
 
+    def test_metadata_labels_switch_between_single_pdf_and_series_modes(self):
+        self.assertEqual(("Title", "Author"), EpubLayoutApp._metadata_label_texts(series_mode=False))
+        self.assertEqual(("Series Title", "Series Author"), EpubLayoutApp._metadata_label_texts(series_mode=True))
+
     def test_inspector_tab_state_switches_active_tab(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.inspector_tabs = {
@@ -503,19 +507,22 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.series_list = _FakeListbox(selection=0)
         app.status = _FakeStatus()
         app.workspace_status = _FakeStatus()
+        app._load_metadata_fields = lambda: setattr(app, "metadata_loaded", True)
         app.refresh_workspace_status = lambda: None
 
         with patch(
             "epub_layout_gui.filedialog.askopenfilenames",
-            return_value=("/tmp/晚安,布布 淺野一二O Vol.02.pdf", "/tmp/晚安,布布 淺野一二O Vol.01.pdf"),
+            return_value=("/tmp/[晚安,布布][淺野一二O] Vol.02.pdf", "/tmp/[晚安,布布][淺野一二O] Vol.01.pdf"),
         ):
             app.import_series()
 
-        self.assertEqual("晚安,布布 淺野一二O", app.series_project.title)
+        self.assertEqual("晚安,布布", app.series_project.title)
+        self.assertEqual("淺野一二O", app.series_project.author)
+        self.assertTrue(app.metadata_loaded)
         self.assertEqual(
             [
-                "Unreviewed Vol.01 晚安,布布 淺野一二O Vol.01.pdf",
-                "Unreviewed Vol.02 晚安,布布 淺野一二O Vol.02.pdf",
+                "Unreviewed Vol.01 [晚安,布布][淺野一二O] Vol.01.pdf",
+                "Unreviewed Vol.02 [晚安,布布][淺野一二O] Vol.02.pdf",
             ],
             app.series_list.items,
         )
@@ -1027,6 +1034,7 @@ class EpubLayoutGuiListTests(unittest.TestCase):
     def test_store_metadata_fields_updates_cover_only_option(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2")])
+        app.series_project = None
         app.title_var = SimpleNamespace(get=lambda: "Book")
         app.author_var = SimpleNamespace(get=lambda: "")
         app.language_var = SimpleNamespace(get=lambda: "zh-Hant")
@@ -1036,6 +1044,28 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         self.assertTrue(app.model.exclude_cover_from_reading)
 
+    def test_store_metadata_fields_updates_series_metadata_in_series_mode(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1")])
+        app.model.source_path = Path("/tmp/[晚安,布布][淺野一二O] Vol.01.pdf")
+        app.model.title = "晚安,布布 Vol.01"
+        app.model.author = "淺野一二O"
+        app.model.language = "ja"
+        app.model.exclude_cover_from_reading = False
+        app.series_project = SimpleNamespace(title="Old", author="", language="zh-Hant")
+        app.title_var = SimpleNamespace(get=lambda: "晚安,布布")
+        app.author_var = SimpleNamespace(get=lambda: "淺野一二O")
+        app.language_var = SimpleNamespace(get=lambda: "ja")
+        app.exclude_cover_var = _FakeBool(True)
+
+        app._store_metadata_fields()
+
+        self.assertEqual("晚安,布布", app.series_project.title)
+        self.assertEqual("淺野一二O", app.series_project.author)
+        self.assertEqual("ja", app.series_project.language)
+        self.assertEqual("晚安,布布 Vol.01", app.model.title)
+        self.assertTrue(app.model.exclude_cover_from_reading)
+
     def test_load_metadata_fields_reads_cover_only_option(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2")])
@@ -1043,6 +1073,7 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.model.author = ""
         app.model.language = "zh-Hant"
         app.model.exclude_cover_from_reading = True
+        app.series_project = None
         app.title_var = SimpleNamespace(set=lambda value: setattr(app, "title_value", value))
         app.author_var = SimpleNamespace(set=lambda value: setattr(app, "author_value", value))
         app.language_var = SimpleNamespace(set=lambda value: setattr(app, "language_value", value))
@@ -1050,6 +1081,26 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         app._load_metadata_fields()
 
+        self.assertTrue(app.exclude_cover_var.get())
+
+    def test_load_metadata_fields_reads_series_metadata_in_series_mode(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1")])
+        app.model.title = "晚安,布布 Vol.01"
+        app.model.author = "淺野一二O"
+        app.model.language = "ja"
+        app.model.exclude_cover_from_reading = True
+        app.series_project = SimpleNamespace(title="晚安,布布", author="淺野一二O", language="ja")
+        app.title_var = SimpleNamespace(set=lambda value: setattr(app, "title_value", value))
+        app.author_var = SimpleNamespace(set=lambda value: setattr(app, "author_value", value))
+        app.language_var = SimpleNamespace(set=lambda value: setattr(app, "language_value", value))
+        app.exclude_cover_var = _FakeBool(False)
+
+        app._load_metadata_fields()
+
+        self.assertEqual("晚安,布布", app.title_value)
+        self.assertEqual("淺野一二O", app.author_value)
+        self.assertEqual("ja", app.language_value)
         self.assertTrue(app.exclude_cover_var.get())
 
 

@@ -34,12 +34,12 @@ class SeriesProject:
         language: str = "zh-Hant",
     ) -> "SeriesProject":
         sorted_paths = sorted((Path(path) for path in pdf_paths), key=_natural_path_key)
-        inferred_title = title or _fallback_series_title(sorted_paths)
+        inferred_title, inferred_author = _infer_series_metadata(sorted_paths)
         volumes = [
             SeriesVolume(pdf_path=path, volume_number=_volume_number(path, index))
             for index, path in enumerate(sorted_paths, start=1)
         ]
-        return cls(inferred_title, author=author, language=language or "zh-Hant", volumes=volumes)
+        return cls(title or inferred_title, author=author or inferred_author, language=language or "zh-Hant", volumes=volumes)
 
     def generated_title(self, volume: SeriesVolume) -> str:
         return f"{self.title} Vol.{volume.volume_number:02d}"
@@ -101,10 +101,30 @@ def _volume_number(path: Path, fallback: int) -> int:
 def _fallback_series_title(paths: list[Path]) -> str:
     if not paths:
         return "Untitled Series"
-    stem = paths[0].stem
-    stem = re.sub(r"\b(?:vol(?:ume)?\.?\s*)\d+\b", "", stem, flags=re.IGNORECASE)
-    stem = re.sub(r"\s+", " ", stem).strip()
+    stem = _stem_without_volume(paths[0])
     return stem or paths[0].stem
+
+
+def _infer_series_metadata(paths: list[Path]) -> tuple[str, str]:
+    if not paths:
+        return "Untitled Series", ""
+    bracketed = re.match(r"^\s*\[([^\]]+)\]\s*\[([^\]]+)\]", paths[0].stem)
+    if bracketed:
+        return bracketed.group(1).strip(), bracketed.group(2).strip()
+    stem = _stem_without_volume(paths[0])
+    title_author = stem.rsplit(None, 1)
+    if len(title_author) == 2 and _looks_like_split_title(title_author[0]):
+        return title_author[0].strip(), title_author[1].strip()
+    return _fallback_series_title(paths), ""
+
+
+def _stem_without_volume(path: Path) -> str:
+    stem = re.sub(r"\b(?:vol(?:ume)?\.?\s*)\d+\b", "", path.stem, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", stem).strip()
+
+
+def _looks_like_split_title(title: str) -> bool:
+    return any(separator in title for separator in (",", "，", "、", "：", ":"))
 
 
 def _safe_filename(title: str) -> str:
