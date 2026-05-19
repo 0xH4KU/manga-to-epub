@@ -11,7 +11,6 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import fitz
 
-from epub_batch_model import BatchProject
 from epub_layout_model import LayoutEntry, LayoutModel
 from epub_series_model import SeriesProject, SeriesVolume
 
@@ -42,8 +41,6 @@ class EpubLayoutApp:
         self.author_var = tk.StringVar(value="")
         self.language_var = tk.StringVar(value="zh-Hant")
         self.exclude_cover_var = tk.BooleanVar(value=False)
-        self.batch_project: BatchProject | None = None
-        self.batch_output_dir: Path | None = None
         self.series_project: SeriesProject | None = None
         self._busy = False
         self._page_drag_source: int | None = None
@@ -58,15 +55,15 @@ class EpubLayoutApp:
 
     @staticmethod
     def _inspector_tab_titles() -> tuple[str, str, str]:
-        return ("Edit", "Book", "Batch")
+        return ("Edit", "Book", "Series")
 
     @staticmethod
     def _edit_section_titles() -> tuple[str, str, str]:
         return ("Insert", "Delete", "Repair")
 
     @staticmethod
-    def _batch_section_titles() -> tuple[str, str, str, str]:
-        return ("Template", "Queue", "Preflight", "Export")
+    def _series_section_titles() -> tuple[str, str]:
+        return ("Review", "Export")
 
     def _bind_shortcuts(self) -> None:
         self.root.bind_all("<Command-z>", lambda _event: self.recover_last_deleted())
@@ -164,10 +161,10 @@ class EpubLayoutApp:
         content.pack(fill=tk.BOTH, expand=True)
         edit_tab = self._add_inspector_tab(content, "Edit")
         book_tab = self._add_inspector_tab(content, "Book")
-        batch_tab = self._add_inspector_tab(content, "Batch")
+        series_tab = self._add_inspector_tab(content, "Series")
         self._build_edit_tab(edit_tab)
         self._build_book_tab(book_tab)
-        self._build_batch_tab(batch_tab)
+        self._build_series_tab(series_tab)
         self._show_inspector_tab("Edit")
 
         statusbar = ttk.Frame(self.root, padding=(8, 4))
@@ -243,25 +240,12 @@ class EpubLayoutApp:
         ).pack(anchor=tk.W, pady=(8, 0))
         self._add_panel_button(parent, "Export Selected Images...", self.export_selected_images)
 
-    def _build_batch_tab(self, parent: ttk.Frame) -> None:
-        self._add_section_label(parent, "Template")
-        self._add_panel_button(parent, "Use Current Layout As Template", self.use_current_layout_as_batch_template)
-        self._add_panel_button(parent, "Load Template Preset...", self.load_batch_template_from_preset)
-        self._add_section_gap(parent)
-        self._add_section_label(parent, "Queue")
-        self.batch_list = tk.Listbox(parent, exportselection=False, height=8)
-        self.batch_list.pack(fill=tk.X, pady=(6, 0))
-        self._add_panel_button(parent, "Add PDFs...", self.add_batch_pdfs)
-        self._add_section_gap(parent)
-        self._add_section_label(parent, "Preflight")
-        self._add_panel_button(parent, "Validate Batch...", self.validate_batch)
+    def _build_series_tab(self, parent: ttk.Frame) -> None:
+        self._add_section_label(parent, "Review")
+        self._add_panel_button(parent, "Mark Selected Volume Ready", self.mark_selected_series_volume_ready)
         self._add_section_gap(parent)
         self._add_section_label(parent, "Export")
-        self._add_panel_button(parent, "Mark Selected Volume Ready", self.mark_selected_series_volume_ready)
         self._add_panel_button(parent, "Export Ready Series...", self.export_ready_series)
-        self._add_section_gap(parent)
-        self._add_panel_button(parent, "Export Ready...", self.export_ready_batch)
-        self._add_panel_button(parent, "Export All...", self.export_all_batch)
 
     def _add_section_label(self, parent: ttk.Frame, text: str) -> None:
         ttk.Label(parent, text=text).pack(anchor=tk.W, pady=(0, 4))
@@ -292,9 +276,6 @@ class EpubLayoutApp:
             AppCommand("Recover Last Deleted", "recover_last_deleted", keywords=("undo",)),
             AppCommand("Set Selected As Cover", "set_selected_as_cover", keywords=("metadata",)),
             AppCommand("Export Selected Images", "export_selected_images", keywords=("extract",)),
-            AppCommand("Validate Batch", "validate_batch", keywords=("check",)),
-            AppCommand("Export Ready Batch", "export_ready_batch", keywords=("batch",)),
-            AppCommand("Export All Batch", "export_all_batch", keywords=("batch", "warnings")),
         )
 
     def _matching_commands(self, query: str) -> list[AppCommand]:
@@ -357,16 +338,16 @@ class EpubLayoutApp:
             page_summary = "No PDF loaded"
         else:
             page_summary = f"Pages: {len(self.model.entries)}"
-        if self.batch_project is None:
-            return f"{page_summary} | Queue: 0"
-        items = self.batch_project.items
-        counts = {"Ready": 0, "Warning": 0, "Failed": 0}
-        for item in items:
-            if item.status in counts:
-                counts[item.status] += 1
+        if self.series_project is None:
+            return f"{page_summary} | Series: 0"
+        volumes = self.series_project.volumes
+        counts = {"Ready": 0, "Edited": 0, "Failed": 0}
+        for volume in volumes:
+            if volume.status in counts:
+                counts[volume.status] += 1
         return (
-            f"{page_summary} | Queue: {len(items)} | "
-            f"Ready: {counts['Ready']} | Warning: {counts['Warning']} | Failed: {counts['Failed']}"
+            f"{page_summary} | Series: {len(volumes)} | "
+            f"Ready: {counts['Ready']} | Edited: {counts['Edited']} | Failed: {counts['Failed']}"
         )
 
     def refresh_workspace_status(self) -> None:
@@ -704,149 +685,6 @@ class EpubLayoutApp:
                 messagebox.showinfo("Export selected images", "No exportable images selected.")
         except Exception as exc:
             messagebox.showerror("Export selected images failed", str(exc))
-
-    def use_current_layout_as_batch_template(self) -> None:
-        if self.model is None:
-            return
-        self._store_metadata_fields()
-        self.batch_project = BatchProject.from_template(self.model)
-        self.refresh_batch_list()
-        self.status.set("Batch template captured from current layout.")
-
-    def load_batch_template_from_preset(self) -> None:
-        filename = filedialog.askopenfilename(
-            title="Load Batch Template Preset",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-            initialdir=str(Path.cwd()),
-        )
-        if not filename:
-            return
-        try:
-            preset_path = Path(filename)
-            self.batch_project = BatchProject.from_preset(preset_path)
-            self.refresh_batch_list()
-            self.status.set(f"Batch template loaded from preset: {preset_path.name}")
-        except Exception as exc:
-            messagebox.showerror("Load batch template failed", str(exc))
-
-    def add_batch_pdfs(self) -> None:
-        if self.batch_project is None:
-            if self.model is None:
-                return
-            self.use_current_layout_as_batch_template()
-        filenames = filedialog.askopenfilenames(
-            title="Add PDFs to Batch",
-            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
-            initialdir=str(Path.cwd()),
-        )
-        if not filenames or self.batch_project is None:
-            return
-        for filename in filenames:
-            self.batch_project.add_pdf(Path(filename))
-        self.refresh_batch_list()
-        self.status.set(f"Added {len(filenames)} PDFs to batch.")
-
-    def validate_batch(self) -> None:
-        if self.batch_project is None:
-            return
-        output_dir = self._batch_output_dir()
-        if output_dir is None:
-            return
-        self._run_background(
-            "Batch validating...",
-            lambda: self._validate_batch_work(output_dir),
-            lambda _result: self._validate_batch_done(),
-        )
-
-    def _validate_batch_work(self, output_dir: Path) -> None:
-        if self.batch_project is not None:
-            self.batch_project.validate_all(output_dir)
-
-    def _validate_batch_done(self) -> None:
-        self.refresh_batch_list()
-        self.status.set(self._batch_validation_status())
-
-    def export_ready_batch(self) -> None:
-        self._export_batch(include_warnings=False)
-
-    def export_all_batch(self) -> None:
-        self._export_batch(include_warnings=True)
-
-    def _export_batch(self, include_warnings: bool) -> None:
-        if self.batch_project is None:
-            return
-        output_dir = self._batch_output_dir()
-        if output_dir is None:
-            return
-        self.batch_project.validate_all(output_dir)
-        self.refresh_batch_list()
-        if not self._confirm_batch_overwrites():
-            self.status.set("Batch export cancelled.")
-            return
-        target = "all eligible items" if include_warnings else "ready items"
-        self._run_background(
-            f"Batch exporting {target}...",
-            lambda: self.batch_project.export_all(output_dir)
-            if include_warnings
-            else self.batch_project.export_ready(output_dir),
-            lambda summary: self._batch_project_done(summary, output_dir),
-        )
-
-    def _confirm_batch_overwrites(self) -> bool:
-        if self.batch_project is None:
-            return False
-        existing = [
-            output_path.name
-            for item in self.batch_project.items
-            for output_path in [getattr(item, "output_path", None)]
-            if output_path is not None and output_path.exists() and item.status != "Failed"
-        ]
-        if not existing:
-            return True
-        preview = ", ".join(existing[:5])
-        suffix = "" if len(existing) <= 5 else f", and {len(existing) - 5} more"
-        return messagebox.askyesno("Overwrite EPUB files", f"Replace existing output files: {preview}{suffix}?")
-
-    def refresh_batch_list(self) -> None:
-        if not hasattr(self, "batch_list"):
-            return
-        self.batch_list.delete(0, tk.END)
-        if self.batch_project is None:
-            return
-        for item in self.batch_project.items:
-            detail = f" ({'; '.join(item.warnings)})" if item.warnings else ""
-            if item.error:
-                detail = f" ({item.error})"
-            self.batch_list.insert(tk.END, f"{item.status} {item.pdf_path.name}{detail}")
-        self.refresh_workspace_status()
-
-    def _batch_output_dir(self) -> Path | None:
-        initial = getattr(self, "batch_output_dir", None) or getattr(self, "output_dir", Path.cwd())
-        output_dir_name = filedialog.askdirectory(title="Batch output directory", initialdir=str(initial))
-        if not output_dir_name:
-            return None
-        self.batch_output_dir = Path(output_dir_name)
-        return self.batch_output_dir
-
-    def _batch_project_done(self, summary: dict[str, int], output_dir: Path) -> None:
-        self.refresh_batch_list()
-        self.status.set(
-            f"Batch exported {summary['exported']} EPUB files; "
-            f"{summary['failed']} failed, {summary['skipped']} skipped."
-        )
-        messagebox.showinfo("Batch complete", f"Exported ready EPUB files to:\n{output_dir}")
-
-    def _batch_validation_status(self) -> str:
-        if self.batch_project is None:
-            return "Batch validation complete: 0 ready, 0 warning, 0 failed."
-        counts = {"Ready": 0, "Warning": 0, "Failed": 0}
-        for item in self.batch_project.items:
-            if item.status in counts:
-                counts[item.status] += 1
-        return (
-            "Batch validation complete: "
-            f"{counts['Ready']} ready, {counts['Warning']} warning, {counts['Failed']} failed."
-        )
 
     def _delete_group(self, delete_action, status_message: str) -> None:
         if self.model is None:

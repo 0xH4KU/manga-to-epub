@@ -20,7 +20,7 @@ This tool focuses on the boring-but-crucial details:
 - Insert external JPEG/PNG pages into the EPUB spine, including separately sourced covers.
 - Export selected spine images losslessly to a folder.
 - Save v2 layout presets with spine order, metadata, cover rule, blanks, deleted pages, and inserted-image references.
-- Build a batch project queue from the current layout template or a saved preset and export ready PDFs together.
+- Import a manga series, review volumes individually, mark reviewed volumes ready, and export ready volumes together.
 - Validate generated EPUB structure before reporting export success.
 - Recover deleted pages during layout editing.
 
@@ -34,7 +34,7 @@ This tool focuses on the boring-but-crucial details:
 - Arbitrary blank page insertion before or after selected pages.
 - Page deletion with recover support.
 - Preset save/load for applying the same layout correction to multiple volumes.
-- Batch export from the current layout template or a saved preset.
+- Series import with generated `Vol.xx` titles and ready-only export.
 
 ## Install
 
@@ -55,7 +55,7 @@ Launch the layout editor:
 .venv/bin/python epub_layout_gui.py
 ```
 
-Typical Apple Books manga workflow:
+Typical single-volume Apple Books manga workflow:
 
 1. Open a PDF volume.
 2. Keep `Preview Apple Books cover gap` enabled.
@@ -70,21 +70,18 @@ Typical Apple Books manga workflow:
 
 The GUI normalizes EPUB internals during export. For example, if source pages 1-3 are deleted and the visible list starts with source `Page 4`, the exported EPUB still uses sequential names such as `page-0001.xhtml` and `images/page-0001.jpg`. The visible source labels remain unchanged so you can trace edits back to the original PDF.
 
-## Batch Project Workflow
+## Series Project Workflow
 
-For a volume set that shares the same correction pattern:
+For a manga series:
 
-1. Open one representative PDF.
-2. Make the layout edits, metadata defaults, and cover choice.
-3. Click `Use Current Layout As Template`.
-4. Click `Add PDFs...` and choose the remaining volumes.
-5. Click `Validate Batch...` and choose an output directory.
-6. Review the batch queue. Matching PDFs are marked `Ready`; page-count mismatches are marked `Warning`; corrupt or unsupported PDFs are marked `Failed`.
-7. Click `Export Ready...` to export only ready items, or `Export All...` to include warning items. Failed items are skipped either way.
+1. Click `Import Series...` and choose the PDFs for the series.
+2. Review the `Series volumes` list. Files are naturally sorted, and EPUB titles are generated as `Series Title Vol.xx`.
+3. Select a volume to load it into the existing page editor.
+4. Fix blank pages, deletions, inserted images, and cover choices per volume.
+5. Click `Mark Selected Volume Ready` after reviewing a volume.
+6. Click `Export Ready Series...` to export only volumes marked `Ready`.
 
-To reuse a saved layout without reopening the sample PDF, click `Load Template Preset...`, then add PDFs and validate the queue.
-
-Before batch export, the GUI checks whether output EPUB files already exist and asks before replacing them.
+The series workflow avoids blindly applying a single correction template to every volume. If Vol.05 needs no blank page while Vol.06 needs two blanks, each volume can keep its own layout before it is marked ready.
 
 ## Presets
 
@@ -147,14 +144,15 @@ For Flate-compressed PDF image streams, the tool wraps the image data into PNG. 
 - `pdf_to_epub_lossless.py` - fixed-layout EPUB exporter.
 - `pdf_to_cbz_lossless.py` - CBZ exporter and low-level PDF image extraction.
 - `epub_layout_model.py` - editable spine model, blank pages, image insertion, metadata, presets, export glue.
-- `epub_batch_model.py` - batch project queue, validation, and export orchestration.
+- `epub_series_model.py` - series workspace, volume status, generated titles, and ready-volume export.
+- `epub_batch_model.py` - legacy batch project queue retained for tests and migration while series workflow replaces it.
 - `epub_layout_gui.py` - Apple Books-oriented layout GUI.
 - `test_*.py` - unit tests for conversion, layout, and preview behavior.
 
 ## Test
 
 ```bash
-.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_model.py epub_batch_model.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py
+.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_model.py epub_batch_model.py epub_series_model.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py
 .venv/bin/python -m unittest
 ```
 
