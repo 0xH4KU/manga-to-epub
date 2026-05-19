@@ -19,6 +19,7 @@ py-modules = [
   "pdf_to_epub_lossless",
   "epub_layout_model",
   "epub_batch_model",
+  "epub_series_model",
   "epub_layout_gui",
 ]
 
