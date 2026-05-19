@@ -214,9 +214,6 @@ class EpubLayoutApp:
         self._add_section_gap(parent)
         self._add_section_label(parent, "Delete")
         self._add_panel_button(parent, "Delete Selected Page", self.delete_selected_entry)
-        self._add_panel_button(parent, "Delete First...", self.ask_delete_first)
-        self._add_panel_button(parent, "Delete Last...", self.ask_delete_last)
-        self._add_panel_button(parent, "Delete Range...", self.ask_delete_range)
         self._add_section_gap(parent)
         self._add_section_label(parent, "Repair")
         self._add_panel_button(parent, "Recover Last Deleted", self.recover_last_deleted)
@@ -274,6 +271,9 @@ class EpubLayoutApp:
             AppCommand("Insert Image Before", "insert_image", (True,), ("page",)),
             AppCommand("Insert Image After", "insert_image", (False,), ("page",)),
             AppCommand("Delete Selected Page", "delete_selected_entry", keywords=("remove",)),
+            AppCommand("Delete First...", "ask_delete_first", keywords=("bulk", "remove")),
+            AppCommand("Delete Last...", "ask_delete_last", keywords=("bulk", "remove")),
+            AppCommand("Delete Range...", "ask_delete_range", keywords=("bulk", "remove")),
             AppCommand("Recover Last Deleted", "recover_last_deleted", keywords=("undo",)),
             AppCommand("Set Selected As Cover", "set_selected_as_cover", keywords=("metadata",)),
             AppCommand("Export Selected Images", "export_selected_images", keywords=("extract",)),

@@ -443,6 +443,9 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         labels = [widget.options.get("text") for widget in widgets]
         self.assertNotIn("Batch queue", labels)
+        self.assertNotIn("Delete First...", labels)
+        self.assertNotIn("Delete Last...", labels)
+        self.assertNotIn("Delete Range...", labels)
 
         batch_queue_parent = app.batch_list.parent
         parent_labels = [
@@ -517,6 +520,24 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         self.assertNotIn("Batch Apply", labels)
         self.assertNotIn("Normalize Export Order", labels)
+
+    def test_command_palette_keeps_bulk_delete_actions_searchable(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+
+        labels = [command.label for command in app._matching_commands("delete")]
+
+        self.assertIn("Delete Selected Page", labels)
+        self.assertIn("Delete First...", labels)
+        self.assertIn("Delete Last...", labels)
+        self.assertIn("Delete Range...", labels)
+
+    def test_command_palette_dispatches_bulk_delete_actions(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.ask_delete_range = lambda: setattr(app, "range_delete_opened", True)
+
+        app._execute_command("Delete Range...")
+
+        self.assertTrue(app.range_delete_opened)
 
     def test_command_palette_dispatches_to_existing_app_method(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

@@ -61,7 +61,7 @@ Typical Apple Books manga workflow:
 2. Keep `Preview Apple Books cover gap` enabled.
 3. Inspect spreads in the preview.
 4. Insert blank pages where needed to realign double-page artwork.
-5. Delete unwanted pages if necessary. Use single-page delete, `Delete First...`, `Delete Last...`, or `Delete Range...`; quick delete numbers refer to the current left-side spine positions.
+5. Delete unwanted pages if necessary. Use `Delete Selected Page` for normal edits; open the command palette for `Delete First...`, `Delete Last...`, or `Delete Range...`.
 6. Use `Recover Last Deleted` or `Cmd+Z` if a page or range was removed by mistake.
 7. Edit title, author, and language, then select any source or inserted image page and use `Set Selected As Cover` when the first image should not be the cover.
 8. Enable `Cover only, exclude from pages` when the cover should be used only as EPUB cover art and not appear as a reading page.
