@@ -20,7 +20,8 @@ This tool focuses on the boring-but-crucial details:
 - Insert external JPEG/PNG pages into the EPUB spine, including separately sourced covers.
 - Export selected spine images losslessly to a folder.
 - Save v2 layout presets with spine order, metadata, cover rule, blanks, deleted pages, and inserted-image references.
-- Import a manga series, review volumes individually, mark reviewed volumes ready, and export ready volumes together.
+- Apply presets to selected series volumes while keeping generated series titles such as `Series Title Vol.01`.
+- Import a manga series, review volumes individually, mark reviewed volumes ready, unready selected volumes when needed, and export ready volumes together.
 - Validate generated EPUB structure before reporting export success.
 - Recover deleted pages during layout editing.
 
@@ -33,8 +34,8 @@ This tool focuses on the boring-but-crucial details:
 - Preview-only Apple Books cover-gap mode with a virtual blank page on the right of the first spine item.
 - Arbitrary blank page insertion before or after selected pages.
 - Page deletion with recover support.
-- Preset save/load for applying the same layout correction to multiple volumes.
-- Series import with generated `Vol.xx` titles and ready-only export.
+- Preset save/load for applying layout corrections to one volume or a scoped set of series volumes.
+- Series import with generated `Vol.xx` titles, multi-volume ready marking, selected-volume unready, and ready-only export.
 
 ## Install
 
@@ -78,14 +79,19 @@ For a manga series:
 2. Review the `Series volumes` list. Files are naturally sorted, and EPUB titles are generated as `Series Title Vol.xx`.
 3. Select a volume to load it into the existing page editor.
 4. Fix blank pages, deletions, inserted images, and cover choices per volume.
-5. Click `Mark Selected Volume Ready` after reviewing a volume.
-6. Click `Export Ready Series...` to export only volumes marked `Ready`.
+5. Select one or more volumes and click `Mark Selected Volume Ready` after reviewing them.
+6. If a ready volume needs more work, select it and click `Unready Selected`. Only the selected volumes are restored from ready history; the rest of the batch stays ready.
+7. Click `Export Ready Series...` to export only volumes marked `Ready`.
 
 The series workflow avoids blindly applying a single correction template to every volume. If Vol.05 needs no blank page while Vol.06 needs two blanks, each volume can keep its own layout before it is marked ready.
+
+When no deleted page is waiting to be recovered, `Cmd+Z` uses the same selected-first unready behavior as `Unready Selected`.
 
 ## Presets
 
 Newly saved presets use `version: 2`. They preserve the edited spine order, blank pages, deleted source pages, metadata defaults, cover-only mode, selected cover rule, and paths to inserted JPEG/PNG pages.
+
+In series mode, `Load Preset` asks which volumes should receive the preset. Scope input supports comma-separated volumes such as `1,2,7`, ranges such as `1-7`, or `all`. After applying a preset, each target volume still uses the series title, author, language, and generated `Vol.xx` title instead of copying one volume's full metadata onto every book.
 
 Version 1 presets from earlier builds still load. When a v2 preset references an inserted image, that image file must still exist at the saved path so it can be reinserted into the target layout.
 
