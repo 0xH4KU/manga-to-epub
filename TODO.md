@@ -2,6 +2,125 @@
 
 This backlog replaces the old "open one PDF, save a template, add the rest" workflow with a series-first workflow for manga volumes.
 
+## Active Fix Wave - 2026-05-19 16:48 Feedback
+
+The current implementation still has several edge cases where Series mode behaves like the old single-PDF flow. This wave makes the two modes explicit:
+
+- **Single PDF mode:** `Open PDF` loads one file, metadata edits apply to that one EPUB, and `Load Preset` applies immediately to the active layout.
+- **Series mode:** `Import Series...` creates a series workspace, metadata edits apply to the series, each volume keeps its own layout, presets require an explicit volume scope, and status reflects review/edit state.
+
+### Wave A - Series Metadata and Dual-Mode Labels
+
+**Problems:**
+
+- After importing a series, the Book tab still says `Title` / `Author`.
+- The fields can show the active PDF's generated title instead of shared series metadata.
+- Filenames like `[晚安,布布][淺野一二O] Vol.09.pdf` should infer title `晚安,布布` and author `淺野一二O`.
+
+**Tasks:**
+
+- Add conservative metadata inference for bracketed filename patterns.
+- In Series mode, load/store `SeriesProject.title`, `SeriesProject.author`, and `SeriesProject.language` from the metadata fields.
+- In Single PDF mode, keep metadata bound to `LayoutModel`.
+- Change metadata labels dynamically:
+  - Series mode: `Series Title`, `Series Author`
+  - Single PDF mode: `Title`, `Author`
+- Keep generated EPUB title per volume as `Series Title Vol.xx`.
+
+**Acceptance:**
+
+- Importing `[晚安,布布][淺野一二O] Vol.09.pdf` shows `Series Title = 晚安,布布`, `Series Author = 淺野一二O`.
+- Single PDF mode still shows and edits regular book title/author.
+- Loading a different series volume does not overwrite series metadata with that volume filename.
+
+### Wave B - Series List Layout and Multi-Select Review
+
+**Problems:**
+
+- The Series volume list is stacked above Spine order and makes the left navigation feel cramped.
+- `Mark Selected Volume Ready` only works on one selected volume.
+
+**Tasks:**
+
+- Put `Series volumes` and `Spine order` in two side-by-side panes inside the left workbench area.
+- Make the series list multi-select.
+- Keep selecting a volume loading one active editor volume.
+- Make `Mark Selected Volume Ready` mark every selected volume.
+
+**Acceptance:**
+
+- Series volumes appear to the left of Spine order.
+- Selecting Vol.01, Vol.02, and Vol.07 then clicking `Mark Selected Volume Ready` marks all three as `Ready`.
+
+### Wave C - Edited Status on Layout Changes
+
+**Problems:**
+
+- Editing a series volume, for example inserting a blank page, still leaves it as `Unreviewed`.
+- Exported or Ready volumes can be changed without their status reflecting that change.
+
+**Tasks:**
+
+- Track the active `SeriesVolume` separately from the current `LayoutModel`.
+- Mark the active series volume `Edited` after successful layout mutations:
+  - drag reorder
+  - insert blank
+  - insert image
+  - delete selected page
+  - recover deleted pages
+  - quick blank before/after cover
+  - bulk delete first/last/range
+  - set selected as cover
+  - series-scoped preset application
+- Do not change status for Single PDF mode.
+
+**Acceptance:**
+
+- In Series mode, inserting a blank page changes the active volume from `Unreviewed` to `Edited`.
+- Editing a `Ready` or `Exported` volume moves it back to `Edited`.
+- Single PDF editing has no series status side effect.
+
+### Wave D - Scoped Preset Loading in Series Mode
+
+**Problems:**
+
+- `Load Preset` in Series mode currently applies directly to the current active volume.
+- Users need to explicitly choose which volumes get the correction.
+
+**Tasks:**
+
+- Keep Single PDF `Load Preset` behavior unchanged.
+- In Series mode, after choosing a preset, prompt for a volume scope:
+  - `1,2,7`
+  - `1-7`
+  - `1-3,7`
+  - `all`
+- Apply the preset to matching volume numbers, not list indexes.
+- Mark every affected volume `Edited`.
+- Refresh the active editor if the active volume was affected.
+
+**Acceptance:**
+
+- Loading a preset with scope `1,2,7` applies it only to Vol.01, Vol.02, and Vol.07.
+- Loading with `all` applies it to every imported volume.
+- A scoped preset never marks target volumes `Ready`.
+- Cancelling the scope prompt applies nothing.
+
+### Wave E - Regression Checks and Commit Hygiene
+
+**Tasks:**
+
+- Add tests before each behavior change.
+- Run focused tests after each wave.
+- Run full unittest and py_compile before the final commit.
+- Stage only touched project files and never stage `.gitignore`.
+
+**Acceptance:**
+
+- `.gitignore` remains untouched and unstaged.
+- Each wave has a focused commit.
+- Final verification output is clean.
+
 The core product model is now:
 
 1. Import a whole series of PDFs.
