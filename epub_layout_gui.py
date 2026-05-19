@@ -132,28 +132,29 @@ class EpubLayoutApp:
 
         left = ttk.Frame(main, padding=8)
         main.add(left, weight=1)
-        navigation = ttk.Panedwindow(left, orient=tk.HORIZONTAL)
+        navigation = ttk.Frame(left)
         navigation.pack(fill=tk.BOTH, expand=True)
-        series_pane = ttk.Frame(navigation, padding=(0, 0, 6, 0))
-        navigation.add(series_pane, weight=1)
-        ttk.Label(series_pane, text="Series volumes").pack(anchor=tk.W)
+        self.series_pane = ttk.Frame(navigation, padding=(0, 0, 6, 0))
+        self.series_pane.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        ttk.Label(self.series_pane, text="Series volumes").pack(anchor=tk.W)
         self.series_list = tk.Listbox(
-            series_pane,
+            self.series_pane,
             exportselection=False,
             activestyle="dotbox",
             selectmode=tk.EXTENDED,
-            width=28,
+            width=34,
         )
         self.series_list.pack(fill=tk.BOTH, expand=True, pady=(6, 12))
         self.series_list.bind("<<ListboxSelect>>", lambda _event: self.select_series_volume())
-        spine_pane = ttk.Frame(navigation, padding=(6, 0, 0, 0))
-        navigation.add(spine_pane, weight=1)
-        ttk.Label(spine_pane, text="Spine order").pack(anchor=tk.W)
-        self.page_list = tk.Listbox(spine_pane, exportselection=False, activestyle="dotbox", selectmode=tk.EXTENDED)
+        self.spine_pane = ttk.Frame(navigation, padding=(6, 0, 0, 0))
+        self.spine_pane.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        ttk.Label(self.spine_pane, text="Spine order").pack(anchor=tk.W)
+        self.page_list = tk.Listbox(self.spine_pane, exportselection=False, activestyle="dotbox", selectmode=tk.EXTENDED)
         self.page_list.pack(fill=tk.BOTH, expand=True, pady=(6, 12))
         self.page_list.bind("<<ListboxSelect>>", lambda _event: self.refresh_preview())
         self.page_list.bind("<ButtonPress-1>", self._page_drag_start)
         self.page_list.bind("<ButtonRelease-1>", self._page_drag_release)
+        self._sync_navigation_mode()
 
         center = ttk.Frame(main, padding=8)
         main.add(center, weight=3)
@@ -399,6 +400,7 @@ class EpubLayoutApp:
         if not filenames:
             return
         self.series_project = SeriesProject.from_pdfs([Path(filename) for filename in filenames])
+        self._sync_navigation_mode()
         self._load_metadata_fields()
         self.refresh_series_list()
         self.status.set(f"Imported series with {len(self.series_project.volumes)} volumes.")
@@ -407,6 +409,7 @@ class EpubLayoutApp:
     def refresh_series_list(self) -> None:
         if not hasattr(self, "series_list"):
             return
+        self._sync_navigation_mode()
         self.series_list.delete(0, tk.END)
         if self.series_project is None:
             return
@@ -484,6 +487,7 @@ class EpubLayoutApp:
         self.model = model
         self.series_project = None
         self.active_series_volume = None
+        self._sync_navigation_mode()
         self.deleted_entries.clear()
         self.thumbnail_cache.clear()
         self._load_metadata_fields()
@@ -508,6 +512,25 @@ class EpubLayoutApp:
         if yview_start is not None:
             self.page_list.yview_moveto(yview_start)
         self.refresh_workspace_status()
+
+    def _sync_navigation_mode(self) -> None:
+        if not hasattr(self, "series_pane") or not hasattr(self, "spine_pane"):
+            return
+        series_mode = getattr(self, "series_project", None) is not None
+        if series_mode:
+            self._pack_navigation_pane(self.series_pane, side=tk.LEFT, fill=tk.BOTH, expand=True)
+            self._pack_navigation_pane(self.spine_pane, side=tk.LEFT, fill=tk.BOTH, expand=True)
+        else:
+            self.series_pane.pack_forget()
+            self._pack_navigation_pane(self.spine_pane, side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    @staticmethod
+    def _pack_navigation_pane(pane, **kwargs) -> None:
+        try:
+            pane.pack_forget()
+        except Exception:
+            pass
+        pane.pack(**kwargs)
 
     def selected_index(self) -> int | None:
         selection = self.page_list.curselection()

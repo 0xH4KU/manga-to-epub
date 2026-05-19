@@ -111,12 +111,17 @@ class _FakeWidget:
         self.children = []
         self.options = {}
         self.pack_args = []
+        self.packed = False
 
     def add(self, child, **_kwargs):
         self.children.append(child)
 
     def pack(self, *args, **kwargs):
         self.pack_args.append((args, kwargs))
+        self.packed = True
+
+    def pack_forget(self):
+        self.packed = False
 
     def pack_propagate(self, *_args, **_kwargs):
         pass
@@ -457,10 +462,11 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertNotIn("Delete Last...", labels)
         self.assertNotIn("Delete Range...", labels)
 
-    def test_import_series_toolbar_and_series_list_are_visible(self):
+    def test_single_pdf_navigation_hides_series_volumes_by_default(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.root = _FakeRoot()
         app.apple_preview = _FakeBool(True)
+        app.series_project = None
         app.title_var = SimpleNamespace()
         app.author_var = SimpleNamespace()
         app.language_var = SimpleNamespace()
@@ -522,13 +528,15 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         labels = [widget.options.get("text") for widget in widgets]
         self.assertIn("Import Series...", labels)
-        self.assertIn("Series volumes", labels)
         self.assertIsNot(app.series_list, app.page_list)
+        self.assertFalse(app.series_pane.packed)
+        self.assertTrue(app.spine_pane.packed)
 
     def test_left_navigation_places_series_volumes_beside_spine_order(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.root = _FakeRoot()
         app.apple_preview = _FakeBool(True)
+        app.series_project = SimpleNamespace(volumes=[])
         app.title_var = SimpleNamespace()
         app.author_var = SimpleNamespace()
         app.language_var = SimpleNamespace()
@@ -591,13 +599,37 @@ class EpubLayoutGuiListTests(unittest.TestCase):
             patch("epub_layout_gui.tk.Canvas", FakeCanvas):
             app._build_ui()
 
-        self.assertEqual(app.series_list.parent.parent, app.page_list.parent.parent)
+        self.assertEqual(app.series_list.parent, app.series_pane)
+        self.assertEqual(app.page_list.parent, app.spine_pane)
+        self.assertTrue(app.series_pane.packed)
+        self.assertTrue(app.spine_pane.packed)
         self.assertIsNot(app.series_list.parent, app.page_list.parent)
         self.assertEqual("extended", app.series_list.options.get("selectmode"))
+
+    def test_import_series_reveals_series_navigation(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.series_pane = _FakeWidget()
+        app.spine_pane = _FakeWidget()
+        app.series_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.workspace_status = _FakeStatus()
+        app._load_metadata_fields = lambda: setattr(app, "metadata_loaded", True)
+        app.refresh_workspace_status = lambda: None
+
+        with patch(
+            "epub_layout_gui.filedialog.askopenfilenames",
+            return_value=("/tmp/[晚安,布布][淺野一二O] Vol.02.pdf", "/tmp/[晚安,布布][淺野一二O] Vol.01.pdf"),
+        ):
+            app.import_series()
+
+        self.assertTrue(app.series_pane.packed)
+        self.assertTrue(app.spine_pane.packed)
 
     def test_import_series_creates_project_and_populates_volume_list(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.series_list = _FakeListbox(selection=0)
+        app.series_pane = _FakeWidget()
+        app.spine_pane = _FakeWidget()
         app.status = _FakeStatus()
         app.workspace_status = _FakeStatus()
         app._load_metadata_fields = lambda: setattr(app, "metadata_loaded", True)
