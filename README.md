@@ -82,7 +82,7 @@ For a volume set that shares the same correction pattern:
 6. Review the batch queue. Matching PDFs are marked `Ready`; page-count mismatches are marked `Warning`; corrupt or unsupported PDFs are marked `Failed`.
 7. Click `Export Ready...` to export only ready items, or `Export All...` to include warning items. Failed items are skipped either way.
 
-To reuse a saved layout without reopening the sample PDF, click `Load Template Preset...`, then add PDFs and validate the queue. The older `Batch Apply` button remains available for simple preset-file workflows.
+To reuse a saved layout without reopening the sample PDF, click `Load Template Preset...`, then add PDFs and validate the queue.
 
 Before batch export, the GUI checks whether output EPUB files already exist and asks before replacing them.
 

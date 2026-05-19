@@ -69,12 +69,18 @@ class EpubLayoutApp:
     def _bind_shortcuts(self) -> None:
         self.root.bind_all("<Command-z>", lambda _event: self.recover_last_deleted())
         self.root.bind_all("<Control-z>", lambda _event: self.recover_last_deleted())
-        self.root.bind_all("<Delete>", lambda _event: self.delete_selected_entry())
-        self.root.bind_all("<BackSpace>", lambda _event: self.delete_selected_entry())
+        self.root.bind_all("<Delete>", self._delete_shortcut)
+        self.root.bind_all("<BackSpace>", self._delete_shortcut)
         self.root.bind_all("<Command-Shift-E>", lambda _event: self.export_selected_images())
         self.root.bind_all("<Control-Shift-E>", lambda _event: self.export_selected_images())
         self.root.bind_all("<Command-k>", lambda _event: self.open_command_palette())
         self.root.bind_all("<Control-k>", lambda _event: self.open_command_palette())
+
+    def _delete_shortcut(self, event) -> str | None:
+        if _event_from_text_input(event):
+            return "break"
+        self.delete_selected_entry()
+        return None
 
     def _run_background(self, status_message: str, work, on_success) -> bool:
         if getattr(self, "_busy", False):
@@ -109,7 +115,6 @@ class EpubLayoutApp:
         ttk.Button(toolbar, text="Export EPUB", command=self.export_epub).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(toolbar, text="Save Preset", command=self.save_preset).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(toolbar, text="Load Preset", command=self.load_preset).pack(side=tk.LEFT, padx=(8, 0))
-        ttk.Button(toolbar, text="Batch Apply", command=self.batch_apply_preset).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(toolbar, text="Command Palette...", command=self.open_command_palette).pack(side=tk.RIGHT)
 
         main = ttk.Panedwindow(self.root, orient=tk.HORIZONTAL)
@@ -218,7 +223,6 @@ class EpubLayoutApp:
         self._add_section_gap(parent)
         self._add_section_label(parent, "Repair")
         self._add_panel_button(parent, "Recover Last Deleted", self.recover_last_deleted)
-        self._add_panel_button(parent, "Normalize Export Order", self.normalize_export_order)
 
     def _build_book_tab(self, parent: ttk.Frame) -> None:
         self._add_section_label(parent, "Metadata")
@@ -235,17 +239,6 @@ class EpubLayoutApp:
             variable=self.exclude_cover_var,
         ).pack(anchor=tk.W, pady=(8, 0))
         self._add_panel_button(parent, "Export Selected Images...", self.export_selected_images)
-        self._add_section_gap(parent)
-        ttk.Label(
-            parent,
-            text=(
-                "Images are exported losslessly.\n"
-                "Blank pages only change EPUB spine order.\n"
-                "Apple Books-like preview inserts a virtual blank on the right of the cover."
-            ),
-            wraplength=220,
-            justify=tk.LEFT,
-        ).pack(anchor=tk.W)
 
     def _build_batch_tab(self, parent: ttk.Frame) -> None:
         self._add_section_label(parent, "Template")
@@ -277,7 +270,6 @@ class EpubLayoutApp:
             AppCommand("Export EPUB", "export_epub", keywords=("save",)),
             AppCommand("Save Preset", "save_preset", keywords=("layout",)),
             AppCommand("Load Preset", "load_preset", keywords=("layout",)),
-            AppCommand("Batch Apply", "batch_apply_preset", keywords=("preset",)),
             AppCommand("Insert Blank Before", "insert_blank", (True,), ("page",)),
             AppCommand("Insert Blank After", "insert_blank", (False,), ("page",)),
             AppCommand("Insert Image Before", "insert_image", (True,), ("page",)),
@@ -1049,6 +1041,17 @@ class _VirtualBlank:
     def __init__(self, label: str):
         self.label = label
         self.is_blank = True
+
+
+def _event_from_text_input(event) -> bool:
+    widget = getattr(event, "widget", None)
+    if widget is None:
+        return False
+    try:
+        widget_class = widget.winfo_class()
+    except Exception:
+        return False
+    return widget_class in {"Entry", "TEntry", "Text", "TCombobox", "Spinbox", "TSpinbox"}
 
 
 def _delete_status(deleted: list[tuple[int, LayoutEntry]], fallback: str) -> str:

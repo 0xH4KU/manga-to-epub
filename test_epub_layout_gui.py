@@ -290,6 +290,34 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertTrue(app.exported)
         self.assertTrue(app.palette_opened)
 
+    def test_delete_shortcut_ignores_text_entry_focus(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = _FakeRoot()
+        app.delete_selected_entry = lambda: setattr(app, "deleted", True)
+        app.recover_last_deleted = lambda: None
+        app.export_selected_images = lambda: None
+        app.open_command_palette = lambda: None
+
+        app._bind_shortcuts()
+        result = app.root.bindings["<Delete>"](SimpleNamespace(widget=SimpleNamespace(winfo_class=lambda: "TEntry")))
+
+        self.assertEqual("break", result)
+        self.assertFalse(hasattr(app, "deleted"))
+
+    def test_backspace_shortcut_ignores_text_entry_focus(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = _FakeRoot()
+        app.delete_selected_entry = lambda: setattr(app, "deleted", True)
+        app.recover_last_deleted = lambda: None
+        app.export_selected_images = lambda: None
+        app.open_command_palette = lambda: None
+
+        app._bind_shortcuts()
+        result = app.root.bindings["<BackSpace>"](SimpleNamespace(widget=SimpleNamespace(winfo_class=lambda: "Entry")))
+
+        self.assertEqual("break", result)
+        self.assertFalse(hasattr(app, "deleted"))
+
     def test_command_palette_queries_match_action_labels(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
 
@@ -297,6 +325,14 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         self.assertIn("Set Selected As Cover", labels)
         self.assertNotIn("Export EPUB", labels)
+
+    def test_command_palette_omits_legacy_and_status_only_actions(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+
+        labels = [command.label for command in app._commands()]
+
+        self.assertNotIn("Batch Apply", labels)
+        self.assertNotIn("Normalize Export Order", labels)
 
     def test_command_palette_dispatches_to_existing_app_method(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
