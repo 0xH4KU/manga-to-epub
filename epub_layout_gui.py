@@ -296,6 +296,7 @@ class EpubLayoutApp:
             AppCommand("Mark Selected Volume Ready", "mark_selected_series_volume_ready", keywords=("series",)),
             AppCommand("Unready Selected", "unready_selected", keywords=("series", "undo")),
             AppCommand("Export Ready Series", "export_ready_series", keywords=("series",)),
+            AppCommand("Validate Series", "validate_series", keywords=("series", "check")),
             AppCommand("Save Project", "save_project", keywords=("series", "project")),
             AppCommand("Open Project", "open_project", keywords=("series", "project")),
             AppCommand("Save Preset", "save_preset", keywords=("layout",)),
@@ -424,6 +425,8 @@ class EpubLayoutApp:
             return
         if self.model is not None:
             self._store_metadata_fields()
+        active_volume = getattr(self, "active_series_volume", None)
+        self.series_project.active_volume_number = getattr(active_volume, "volume_number", None)
         filename = filedialog.asksaveasfilename(
             title="Save Series Project",
             defaultextension=".json",
@@ -462,12 +465,26 @@ class EpubLayoutApp:
             self._sync_navigation_mode()
             self._load_metadata_fields()
             self.refresh_series_list()
+            self._restore_saved_active_series_selection()
             self.refresh_list()
             self.refresh_preview()
             self.status.set(f"Opened project: {project_path.name}")
             self.refresh_workspace_status()
         except Exception as exc:
             messagebox.showerror("Open project failed", str(exc))
+
+    def _restore_saved_active_series_selection(self) -> None:
+        if self.series_project is None or not hasattr(self, "series_list"):
+            return
+        active_number = getattr(self.series_project, "active_volume_number", None)
+        if active_number is None:
+            return
+        for index, volume in enumerate(self.series_project.volumes):
+            if volume.volume_number == active_number:
+                self.active_series_volume = volume
+                self.series_list.selection_clear(0, tk.END)
+                self.series_list.selection_set(index)
+                return
 
     def refresh_series_list(self) -> None:
         if not hasattr(self, "series_list"):
@@ -609,6 +626,30 @@ class EpubLayoutApp:
             self._series_export_done,
         )
 
+    def validate_series(self) -> None:
+        if self.series_project is None:
+            return
+        output_dir = Path(getattr(self, "output_dir", Path.cwd()))
+        summary = self.series_project.validate_all(output_dir)
+        self.refresh_series_list()
+        self.refresh_workspace_status()
+        warning_lines = self._series_warning_lines()
+        if warning_lines:
+            messagebox.showwarning("Series validation warnings", "\n".join(warning_lines))
+        self.status.set(
+            f"Series validation: {summary['ready']} ready, {summary['failed']} failed, "
+            f"{summary['warnings']} warnings."
+        )
+
+    def _series_warning_lines(self) -> list[str]:
+        if self.series_project is None:
+            return []
+        lines: list[str] = []
+        for volume in self.series_project.volumes:
+            for warning in volume.warnings:
+                lines.append(f"Vol.{volume.volume_number:02d}: {warning}")
+        return lines[:20]
+
     def _export_ready_series_work(self, output_dir: Path) -> dict[str, int]:
         summary = {"exported": 0, "failed": 0, "skipped": 0, "warnings": 0}
         if self.series_project is None:
@@ -636,6 +677,8 @@ class EpubLayoutApp:
             self.status.set(f"Failed Vol.{volume_number:02d}.")
         elif status == "skipped":
             self.status.set(f"Skipped Vol.{volume_number:02d}.")
+        elif status == "started":
+            self.status.set(f"Exporting Vol.{volume_number:02d}.")
 
     def _series_export_done(self, summary: dict[str, int]) -> None:
         self.refresh_series_list()

@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from zipfile import ZipFile
 
-from epub_series_model import SeriesProject
+from epub_series_model import SeriesProject, SeriesVolume
 from test_epub_layout_model import _tiny_png
 from test_pdf_to_cbz_lossless import _two_page_pdf_with_late_cover
 
@@ -222,6 +222,56 @@ class EpubSeriesModelTests(unittest.TestCase):
             restored_model = restored.model_for_volume(restored.volumes[0])
             self.assertEqual(cover_path, restored_model.entries[1].inserted_path)
 
+    def test_project_payload_round_trips_active_volume_number(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project_path = Path(tmp) / "series-project.json"
+            vol01 = Path(tmp) / "Series Vol.01.pdf"
+            vol02 = Path(tmp) / "Series Vol.02.pdf"
+            for path in (vol01, vol02):
+                path.write_bytes(_two_page_pdf_with_late_cover())
+            project = SeriesProject.from_pdfs([vol01, vol02], title="Series")
+            project.active_volume_number = 2
+
+            payload = project.to_payload(project_path)
+            restored = SeriesProject.from_payload(payload, project_path)
+
+            self.assertEqual(2, payload["active_volume_number"])
+            self.assertEqual(2, restored.active_volume_number)
+
+    def test_project_payload_records_missing_inserted_image_warning_without_crashing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project_path = Path(tmp) / "series-project.json"
+            pdf_path = Path(tmp) / "Series Vol.01.pdf"
+            missing_cover = Path(tmp) / "missing-cover.png"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            payload = {
+                "version": 1,
+                "title": "Series",
+                "author": "",
+                "language": "zh-Hant",
+                "volumes": [
+                    {
+                        "pdf_path": str(pdf_path),
+                        "volume_number": 1,
+                        "status": "Ready",
+                        "layout": {
+                            "version": 2,
+                            "source_page_count": 2,
+                            "metadata": {},
+                            "cover": {"kind": "first-image", "source_index": None, "entry_id": None},
+                            "entries": [
+                                {"kind": "source", "source_index": 1},
+                                {"kind": "inserted", "path": str(missing_cover)},
+                            ],
+                        },
+                    }
+                ],
+            }
+
+            restored = SeriesProject.from_payload(payload, project_path)
+
+            self.assertIn(f"Inserted image not found: {missing_cover}", restored.volumes[0].warnings)
+
     def test_validate_all_reports_duplicate_volumes_missing_pdfs_and_filename_collisions(self):
         with tempfile.TemporaryDirectory() as tmp:
             existing_pdf = Path(tmp) / "Series Vol.01.pdf"
@@ -238,11 +288,110 @@ class EpubSeriesModelTests(unittest.TestCase):
 
             summary = project.validate_all(output_dir)
 
-            self.assertEqual({"ready": 1, "failed": 1, "warnings": 2}, summary)
+            self.assertEqual({"ready": 0, "failed": 2, "warnings": 2}, summary)
             self.assertEqual(["Output filename collision: Series Vol.01.epub", "Duplicate volume number: 1"], project.volumes[0].warnings)
             self.assertEqual(["Output filename collision: Series Vol.01.epub", "Duplicate volume number: 1"], project.volumes[1].warnings)
+            self.assertEqual("Failed", project.volumes[0].status)
             self.assertEqual("Failed", project.volumes[1].status)
             self.assertIn("Source PDF not found", project.volumes[1].error)
+
+    def test_validate_ready_reports_missing_inserted_image_on_exact_volume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "Series Vol.01.pdf"
+            missing_cover = Path(tmp) / "missing-cover.png"
+            output_dir = Path(tmp) / "out"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            project = SeriesProject.from_pdfs([pdf_path], title="Series")
+            project.volumes[0].status = "Ready"
+            project.volumes[0].layout_payload = {
+                "version": 2,
+                "source_page_count": 2,
+                "metadata": {},
+                "cover": {"kind": "first-image", "source_index": None, "entry_id": None},
+                "entries": [
+                    {"kind": "source", "source_index": 1},
+                    {"kind": "inserted", "path": str(missing_cover)},
+                ],
+            }
+
+            summary = project.validate_ready(output_dir)
+
+            self.assertEqual({"ready": 0, "failed": 1, "warnings": 1}, summary)
+            self.assertEqual("Failed", project.volumes[0].status)
+            self.assertIn(f"Inserted image not found: {missing_cover}", project.volumes[0].error)
+            self.assertIn(f"Missing inserted image: {missing_cover}", project.volumes[0].warnings)
+
+    def test_validate_ready_fails_zero_reading_pages_after_cover_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "Series Vol.01.pdf"
+            output_dir = Path(tmp) / "out"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            project = SeriesProject.from_pdfs([pdf_path], title="Series")
+            volume = project.volumes[0]
+            volume.status = "Ready"
+            model = project.model_for_volume(volume)
+            model.delete_last(1)
+            model.exclude_cover_from_reading = True
+
+            summary = project.validate_ready(output_dir)
+
+            self.assertEqual({"ready": 0, "failed": 1, "warnings": 0}, summary)
+            self.assertEqual("Failed", volume.status)
+            self.assertEqual("Cover-only export would leave no reading pages", volume.error)
+
+    def test_validate_ready_warns_when_page_count_differs_from_first_volume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first_pdf = Path(tmp) / "Series Vol.01.pdf"
+            second_pdf = Path(tmp) / "Series Vol.02.pdf"
+            output_dir = Path(tmp) / "out"
+            first_pdf.write_bytes(_two_page_pdf_with_late_cover())
+            second_pdf.write_bytes(_two_page_pdf_with_late_cover())
+            project = SeriesProject.from_pdfs([first_pdf, second_pdf], title="Series")
+            for volume in project.volumes:
+                volume.status = "Ready"
+            second_model = project.model_for_volume(project.volumes[1])
+            second_model.delete_last(1)
+
+            summary = project.validate_ready(output_dir)
+
+            self.assertEqual({"ready": 2, "failed": 0, "warnings": 1}, summary)
+            self.assertEqual(["Page count differs from baseline: 1 != 2"], project.volumes[1].warnings)
+
+    def test_export_ready_skips_filename_collisions_without_overwriting(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first_pdf = Path(tmp) / "Series Vol.01.pdf"
+            second_pdf = Path(tmp) / "Other Vol.01.pdf"
+            output_dir = Path(tmp) / "out"
+            first_pdf.write_bytes(_two_page_pdf_with_late_cover())
+            second_pdf.write_bytes(_two_page_pdf_with_late_cover())
+            project = SeriesProject(
+                "Series",
+                volumes=[
+                    SeriesVolume(first_pdf, volume_number=1, status="Ready"),
+                    SeriesVolume(second_pdf, volume_number=1, status="Ready"),
+                ],
+            )
+
+            summary = project.export_ready(output_dir)
+
+            self.assertEqual({"exported": 0, "failed": 2, "skipped": 0, "warnings": 2}, summary)
+            self.assertFalse((output_dir / "Series Vol.01.epub").exists())
+            self.assertEqual(["Failed", "Failed"], [volume.status for volume in project.volumes])
+            self.assertIn("Output filename collision", project.volumes[0].error)
+
+    def test_export_ready_iter_yields_started_before_each_ready_volume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "Series Vol.01.pdf"
+            output_dir = Path(tmp) / "out"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            project = SeriesProject.from_pdfs([pdf_path], title="Series")
+            project.volumes[0].status = "Ready"
+
+            events = list(project.export_ready_iter(output_dir))
+
+            self.assertEqual("started", events[0]["status"])
+            self.assertEqual(1, events[0]["volume_number"])
+            self.assertEqual("exported", events[1]["status"])
 
     def test_export_ready_validates_and_skips_failed_volumes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -291,6 +440,7 @@ class EpubSeriesModelTests(unittest.TestCase):
 
             self.assertEqual(
                 [
+                    {"volume_number": 1, "status": "started", "output_path": output_dir / "Series Vol.01.epub"},
                     {"volume_number": 1, "status": "exported", "output_path": output_dir / "Series Vol.01.epub"},
                     {"volume_number": 2, "status": "skipped", "output_path": None},
                     {"volume_number": 3, "status": "failed", "output_path": output_dir / "Series Vol.03.epub"},

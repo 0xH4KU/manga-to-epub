@@ -928,6 +928,14 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual({"exported": 1, "failed": 0, "skipped": 0, "warnings": 0}, summary)
         self.assertEqual("Exported Vol.01.", app.status.value)
 
+    def test_series_export_progress_reports_started_volume(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.status = _FakeStatus()
+
+        app._series_export_progress({"volume_number": 2, "status": "started"})
+
+        self.assertEqual("Exporting Vol.02.", app.status.value)
+
     def test_bind_shortcuts_registers_safe_layout_actions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.root = _FakeRoot()
@@ -1013,6 +1021,13 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         self.assertIn("Save Project", labels)
         self.assertIn("Open Project", labels)
+
+    def test_command_palette_includes_validate_series_action(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+
+        labels = [command.label for command in app._matching_commands("validate")]
+
+        self.assertIn("Validate Series", labels)
 
     def test_command_palette_dispatches_bulk_delete_actions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
@@ -1605,6 +1620,24 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual("Saved project: series-project.json", app.status.value)
         Path("/tmp/series-project.json").unlink()
 
+    def test_save_project_records_active_volume_number(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.status = _FakeStatus()
+        app.model = None
+        active = SimpleNamespace(volume_number=2)
+        project = SimpleNamespace(
+            active_volume_number=None,
+            to_payload=lambda project_path: {"version": 1, "active": project.active_volume_number},
+        )
+        app.series_project = project
+        app.active_series_volume = active
+
+        with patch("epub_layout_gui.filedialog.asksaveasfilename", return_value="/tmp/active-series-project.json"):
+            app.save_project()
+
+        self.assertEqual(2, project.active_volume_number)
+        Path("/tmp/active-series-project.json").unlink()
+
     def test_open_project_loads_series_project_and_refreshes_workspace(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.series_list = _FakeListbox(selection=0)
@@ -1643,6 +1676,73 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual(["Ready Vol.01 vol01.pdf"], app.series_list.items)
         self.assertEqual("Opened project: open-series-project.json", app.status.value)
         payload_path.unlink()
+
+    def test_open_project_restores_active_series_selection_when_saved_volume_exists(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.series_list = _FakeListbox(selection=0)
+        app.page_list = _FakeListbox(selection=0)
+        app.series_pane = _FakeWidget()
+        app.spine_pane = _FakeWidget()
+        app.status = _FakeStatus()
+        app.deleted_entries = []
+        app.ready_status_undo = []
+        app.thumbnail_cache = {}
+        app._load_metadata_fields = lambda: None
+        app.refresh_preview = lambda: None
+        app.refresh_workspace_status = lambda: None
+        payload_path = Path("/tmp/open-active-series-project.json")
+        payload_path.write_text(json.dumps({"version": 1}), encoding="utf-8")
+        volumes = [
+            SimpleNamespace(pdf_path=Path("/tmp/vol01.pdf"), volume_number=1, status="Ready"),
+            SimpleNamespace(pdf_path=Path("/tmp/vol02.pdf"), volume_number=2, status="Edited"),
+        ]
+        loaded_project = SimpleNamespace(volumes=volumes, title="Series", author="", language="zh-Hant", active_volume_number=2)
+
+        with patch("epub_layout_gui.filedialog.askopenfilename", return_value=str(payload_path)), \
+            patch("epub_layout_gui.SeriesProject.from_payload", return_value=loaded_project):
+            app.open_project()
+
+        self.assertIs(volumes[1], app.active_series_volume)
+        self.assertEqual(1, app.series_list.selection)
+        payload_path.unlink()
+
+    def test_validate_series_updates_warnings_and_status(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.status = _FakeStatus()
+        app.output_dir = Path("/tmp")
+        volume = SimpleNamespace(volume_number=1, status="Ready", warnings=["check"], error=None)
+        project = SimpleNamespace(
+            volumes=[volume],
+            validate_all=lambda output_dir: {"ready": 1, "failed": 0, "warnings": 1},
+        )
+        app.series_project = project
+        app.refresh_series_list = lambda: setattr(app, "series_refreshed", True)
+        app.refresh_workspace_status = lambda: setattr(app, "workspace_refreshed", True)
+
+        with patch("epub_layout_gui.messagebox.showwarning"):
+            app.validate_series()
+
+        self.assertTrue(app.series_refreshed)
+        self.assertTrue(app.workspace_refreshed)
+        self.assertEqual("Series validation: 1 ready, 0 failed, 1 warnings.", app.status.value)
+
+    def test_validate_series_shows_warning_summary_dialog(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.status = _FakeStatus()
+        app.output_dir = Path("/tmp")
+        volume = SimpleNamespace(volume_number=1, status="Ready", warnings=["check page count"], error=None)
+        app.series_project = SimpleNamespace(
+            volumes=[volume],
+            validate_all=lambda output_dir: {"ready": 1, "failed": 0, "warnings": 1},
+        )
+        app.refresh_series_list = lambda: None
+        app.refresh_workspace_status = lambda: None
+
+        with patch("epub_layout_gui.messagebox.showwarning") as showwarning:
+            app.validate_series()
+
+        showwarning.assert_called_once()
+        self.assertIn("Vol.01: check page count", showwarning.call_args.args[1])
 
 
 if __name__ == "__main__":

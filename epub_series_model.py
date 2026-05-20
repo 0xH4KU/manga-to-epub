@@ -26,6 +26,7 @@ class SeriesProject:
     author: str = ""
     language: str = "zh-Hant"
     volumes: list[SeriesVolume] = field(default_factory=list)
+    active_volume_number: int | None = None
 
     @classmethod
     def from_pdfs(
@@ -113,6 +114,7 @@ class SeriesProject:
                     yield _export_event(volume, "failed")
                 continue
             try:
+                yield _export_event(volume, "started")
                 model = self.model_for_volume(volume)
                 volume.output_path = output_dir / f"{_safe_filename(self.generated_title(volume))}.epub"
                 model.export_epub(volume.output_path, overwrite=True)
@@ -144,6 +146,7 @@ class SeriesProject:
             output_name = f"{_safe_filename(self.generated_title(volume))}.epub"
             output_name_counts[output_name] = output_name_counts.get(output_name, 0) + 1
 
+        baseline_page_count = self._baseline_page_count(ready_only)
         summary = {"ready": 0, "failed": 0, "warnings": 0}
         for volume in self.volumes:
             if ready_only and volume.status != "Ready":
@@ -154,11 +157,16 @@ class SeriesProject:
             output_name = volume.output_path.name
             if output_name_counts.get(output_name, 0) > 1:
                 volume.warnings.append(f"Output filename collision: {output_name}")
+                volume.status = "Failed"
+                volume.error = f"Output filename collision: {output_name}"
             if volume_number_counts.get(volume.volume_number, 0) > 1:
                 volume.warnings.append(f"Duplicate volume number: {volume.volume_number}")
             if not volume.pdf_path.exists():
                 volume.status = "Failed"
                 volume.error = f"Source PDF not found: {volume.pdf_path}"
+            else:
+                self._validate_volume_layout(volume, baseline_page_count)
+            if volume.status == "Failed":
                 summary["failed"] += 1
             else:
                 summary["ready"] += 1
@@ -166,12 +174,69 @@ class SeriesProject:
                 summary["warnings"] += 1
         return summary
 
+    def _baseline_page_count(self, ready_only: bool) -> int | None:
+        for volume in self.volumes:
+            if ready_only and volume.status != "Ready":
+                continue
+            if not volume.pdf_path.exists():
+                continue
+            try:
+                if volume.layout_model is not None:
+                    return sum(1 for entry in volume.layout_model.entries if not entry.is_blank)
+                if volume.layout_payload is not None:
+                    return _payload_image_page_count(volume.layout_payload)
+                return LayoutModel.from_pdf(volume.pdf_path).source_page_count
+            except Exception:
+                continue
+        return None
+
+    def _validate_volume_layout(self, volume: SeriesVolume, baseline_page_count: int | None) -> None:
+        try:
+            image_count = self._image_page_count(volume)
+        except Exception as exc:
+            volume.status = "Failed"
+            volume.error = str(exc)
+            return
+        if image_count == 0:
+            volume.status = "Failed"
+            volume.error = "Cannot export an EPUB without image pages"
+            return
+        if baseline_page_count is not None and image_count != baseline_page_count:
+            volume.warnings.append(f"Page count differs from baseline: {image_count} != {baseline_page_count}")
+        if self._cover_only_would_remove_all_reading_pages(volume):
+            volume.status = "Failed"
+            volume.error = "Cover-only export would leave no reading pages"
+
+    def _image_page_count(self, volume: SeriesVolume) -> int:
+        if volume.layout_model is not None:
+            return sum(1 for entry in volume.layout_model.entries if not entry.is_blank)
+        if volume.layout_payload is not None:
+            missing = _missing_inserted_images(volume.layout_payload)
+            if missing:
+                path = missing[0]
+                volume.warnings.append(f"Missing inserted image: {path}")
+                volume.status = "Failed"
+                volume.error = f"Inserted image not found: {path}"
+                raise ValueError(volume.error)
+            return _payload_image_page_count(volume.layout_payload)
+        return LayoutModel.from_pdf(volume.pdf_path).source_page_count
+
+    def _cover_only_would_remove_all_reading_pages(self, volume: SeriesVolume) -> bool:
+        if volume.layout_model is not None:
+            return volume.layout_model.exclude_cover_from_reading and self._image_page_count(volume) <= 1
+        payload = volume.layout_payload
+        if payload is None:
+            return False
+        metadata = payload.get("metadata", {})
+        return bool(metadata.get("exclude_cover_from_reading", False)) and _payload_image_page_count(payload) <= 1
+
     def to_payload(self, project_path: Path | None = None) -> dict:
         return {
             "version": 1,
             "title": self.title,
             "author": self.author,
             "language": self.language,
+            "active_volume_number": self.active_volume_number,
             "volumes": [
                 {
                     "pdf_path": _serialize_path(volume.pdf_path, project_path),
@@ -192,15 +257,19 @@ class SeriesProject:
             raise ValueError("Unsupported series project version")
         volumes = []
         for item in payload.get("volumes", []):
+            layout_payload = _deserialize_layout_payload(item.get("layout"), project_path)
+            warnings = list(item.get("warnings", []))
+            for missing_path in _missing_inserted_images(layout_payload or {}):
+                warnings.append(f"Inserted image not found: {missing_path}")
             volumes.append(
                 SeriesVolume(
                     pdf_path=_deserialize_path(item.get("pdf_path", ""), project_path),
                     volume_number=int(item.get("volume_number", len(volumes) + 1)),
                     status=item.get("status") or "Unreviewed",
                     output_path=_deserialize_optional_path(item.get("output_path"), project_path),
-                    warnings=list(item.get("warnings", [])),
+                    warnings=warnings,
                     error=item.get("error"),
-                    layout_payload=_deserialize_layout_payload(item.get("layout"), project_path),
+                    layout_payload=layout_payload,
                 )
             )
         return cls(
@@ -208,6 +277,7 @@ class SeriesProject:
             author=payload.get("author") or "",
             language=payload.get("language") or "zh-Hant",
             volumes=volumes,
+            active_volume_number=payload.get("active_volume_number"),
         )
 
 
@@ -314,6 +384,20 @@ def _deserialize_layout_entry(entry: dict, project_path: Path | None) -> dict:
     if restored.get("kind") == "inserted" and restored.get("path"):
         restored["path"] = str(_deserialize_path(restored["path"], project_path))
     return restored
+
+
+def _missing_inserted_images(payload: dict) -> list[Path]:
+    missing: list[Path] = []
+    for entry in payload.get("entries", []):
+        if entry.get("kind") == "inserted":
+            path = Path(entry.get("path", ""))
+            if not path.exists():
+                missing.append(path)
+    return missing
+
+
+def _payload_image_page_count(payload: dict) -> int:
+    return sum(1 for entry in payload.get("entries", []) if entry.get("kind") in {"source", "inserted"})
 
 
 def _serialize_optional_path(path: Path | None, project_path: Path | None) -> str | None:

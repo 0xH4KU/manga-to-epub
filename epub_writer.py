@@ -26,11 +26,11 @@ class EpubPage:
 
 
 def media_type_for_ext(ext: str) -> str:
-    if ext == "jpg":
+    ext = ext.lower()
+    if ext in {"jpg", "jpeg"}:
         return "image/jpeg"
-    guessed = mimetypes.types_map.get(f".{ext}")
-    if guessed:
-        return guessed
+    if ext == "png":
+        return "image/png"
     raise PdfImageError(f"Unsupported image extension for EPUB: {ext}")
 
 

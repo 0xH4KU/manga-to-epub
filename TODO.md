@@ -6,7 +6,7 @@ Current verified baseline:
 
 - `.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_gui_support.py epub_layout_preview.py epub_layout_model.py epub_batch_model.py epub_series_model.py epub_writer.py epub_validation.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py`
 - `.venv/bin/python -m unittest`
-- Result on 2026-05-20: 144 tests passed with the project `.venv`.
+- Result on 2026-05-20: 158 tests passed with the project `.venv`.
 
 Use `.venv/bin/python` for local verification. System `python3` may not have `fitz` / PyMuPDF installed.
 
@@ -68,7 +68,7 @@ Tasks:
 - [x] Add one public media-type helper for supported image extensions.
 - [x] Stop importing private EPUB helpers from `epub_layout_model.py`.
 - [x] Add focused tests that EPUB, CBZ, and layout exports use the same payload rule for already-extracted PNG streams.
-- [ ] Add focused tests that unsupported image extensions still fail clearly.
+- [x] Add focused tests that unsupported image extensions still fail clearly.
 - [x] Keep page/blank construction explicit because source image pages and normalized spine pages have different semantics.
 - [x] Keep output filenames, EPUB manifest IDs, and existing byte-preservation behavior unchanged.
 
@@ -155,21 +155,21 @@ Tasks:
 - [x] Add GUI commands: `Save Project...`, `Open Project...`.
 - [x] Add command palette entries for project save/load.
 - [x] Update status bar after project load.
-- [ ] Ensure active series selection is restored if the saved active volume still exists.
+- [x] Ensure active series selection is restored if the saved active volume still exists.
 
 Acceptance criteria:
 
 - [x] User can import a series, edit multiple volumes, save a project file, restart the GUI, open the project, and see the same volume statuses.
 - [x] Ready/Edited/Failed/Unreviewed states survive round-trip.
 - [x] Per-volume blanks, deletions, inserted images, cover selection, cover-only mode, title/author/language survive round-trip.
-- [ ] Missing PDFs or inserted images produce clear warnings instead of crashing the whole project load.
+- [x] Missing PDFs or inserted images produce clear warnings instead of crashing the whole project load.
 - [x] Project files saved next to PDFs continue working if the folder is moved together.
 
 Tests:
 
 - [x] Unit test project payload round-trip with two volumes and different statuses.
 - [x] Unit test relative path restoration.
-- [ ] Unit test missing inserted image warning.
+- [x] Unit test missing inserted image warning.
 - [x] GUI unit test that `Save Project...` calls the model serializer and updates status.
 - [x] GUI unit test that `Open Project...` refreshes series list, metadata fields, and preview.
 
@@ -193,10 +193,10 @@ Checks to add:
 
 - [x] Output filename collision after safe filename generation.
 - [x] Missing source PDF.
-- [ ] Missing inserted image referenced by a volume layout.
-- [ ] Zero image pages after edits.
-- [ ] Cover-only export would remove all reading pages.
-- [ ] Page count differs from first loaded volume or an optional baseline.
+- [x] Missing inserted image referenced by a volume layout.
+- [x] Zero image pages after edits.
+- [x] Cover-only export would remove all reading pages.
+- [x] Page count differs from first loaded volume or an optional baseline.
 - [x] Duplicate volume numbers after import.
 - [ ] Unsupported image filter errors during lazy model load.
 
@@ -207,21 +207,21 @@ Tasks:
 - [x] Store warnings on each `SeriesVolume`.
 - [x] Update `export_ready` to validate first.
 - [x] Decide whether warnings block export. Recommended first pass: warnings do not block, errors block.
-- [ ] Show a summary dialog before export if warnings exist.
-- [ ] Add a command palette item: `Validate Series`.
+- [x] Show a summary dialog before export if warnings exist.
+- [x] Add a command palette item: `Validate Series`.
 
 Acceptance criteria:
 
 - [x] Export summary distinguishes exported, failed, skipped, and warning counts.
-- [ ] Filename collision is reported before any colliding EPUB is overwritten.
-- [ ] Missing inserted image is tied to the exact volume and path.
+- [x] Filename collision is reported before any colliding EPUB is overwritten.
+- [x] Missing inserted image is tied to the exact volume and path.
 - [x] Failed volume does not stop later ready volumes from exporting.
 
 Tests:
 
 - [x] Unit test filename collision warnings.
 - [x] Unit test missing PDF failure.
-- [ ] Unit test missing inserted cover warning/failure.
+- [x] Unit test missing inserted cover warning/failure.
 - [x] Unit test duplicate volume numbers.
 - [x] Unit test export skips invalid volumes and continues valid ones.
 
@@ -243,7 +243,7 @@ Primary files:
 Tasks:
 
 - [x] Add an iterator-style export API, e.g. `SeriesProject.export_ready_iter(output_dir)`.
-- [ ] Yield per-volume progress events: started, exported, skipped, failed.
+- [x] Yield per-volume progress events: started, exported, skipped, failed.
 - [ ] Add a small progress window with current volume, counts, and a disabled/enabled close button.
 - [ ] Add cancel support if simple to wire safely.
 - [x] Keep `_busy` true during export and reject concurrent open/export operations.
@@ -253,7 +253,7 @@ Tasks:
 Acceptance criteria:
 
 - [x] GUI remains responsive during export.
-- [ ] User sees current volume and aggregate progress.
+- [x] User sees current volume and aggregate progress.
 - [x] Failure in one volume is visible but does not hide the final summary.
 - [x] Reentrant export/open actions are blocked while export runs.
 

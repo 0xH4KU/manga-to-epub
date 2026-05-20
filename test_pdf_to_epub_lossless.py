@@ -7,7 +7,14 @@ from contextlib import redirect_stderr
 from unittest.mock import patch
 
 from pdf_to_cbz_lossless import PdfImageError
-from pdf_to_epub_lossless import EpubPage, _validate_epub_structure, convert_pdf_to_epub, main, write_epub_from_pages
+from pdf_to_epub_lossless import (
+    EpubPage,
+    _media_type_for_ext,
+    _validate_epub_structure,
+    convert_pdf_to_epub,
+    main,
+    write_epub_from_pages,
+)
 from test_pdf_to_cbz_lossless import _two_page_pdf_with_late_cover
 
 
@@ -244,6 +251,10 @@ class PdfToEpubLosslessTests(unittest.TestCase):
                 )
 
             self.assertFalse(epub_path.exists())
+
+    def test_unsupported_epub_image_extension_fails_clearly(self):
+        with self.assertRaisesRegex(PdfImageError, "Unsupported image extension for EPUB: gif"):
+            _media_type_for_ext("gif")
 
     def test_valid_generated_epub_passes_structure_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
