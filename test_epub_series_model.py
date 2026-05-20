@@ -246,6 +246,38 @@ class EpubSeriesModelTests(unittest.TestCase):
             self.assertEqual("Failed", project.volumes[1].status)
             self.assertIn("Source PDF not found", project.volumes[1].error)
 
+    def test_export_ready_iter_yields_per_volume_progress_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ready_pdf = Path(tmp) / "Series Vol.01.pdf"
+            skipped_pdf = Path(tmp) / "Series Vol.02.pdf"
+            missing_pdf = Path(tmp) / "Series Vol.03.pdf"
+            output_dir = Path(tmp) / "out"
+            ready_pdf.write_bytes(_two_page_pdf_with_late_cover())
+            skipped_pdf.write_bytes(_two_page_pdf_with_late_cover())
+            project = SeriesProject.from_pdfs([ready_pdf, skipped_pdf], title="Series")
+            project.volumes[0].status = "Ready"
+            project.volumes[1].status = "Edited"
+            project.volumes.append(
+                type(project.volumes[0])(
+                    pdf_path=missing_pdf,
+                    volume_number=3,
+                    status="Ready",
+                )
+            )
+
+            events = list(project.export_ready_iter(output_dir))
+
+            self.assertEqual(
+                [
+                    {"volume_number": 1, "status": "exported", "output_path": output_dir / "Series Vol.01.epub"},
+                    {"volume_number": 2, "status": "skipped", "output_path": None},
+                    {"volume_number": 3, "status": "failed", "output_path": output_dir / "Series Vol.03.epub"},
+                    {"status": "summary", "exported": 1, "failed": 1, "skipped": 1, "warnings": 0},
+                ],
+                events,
+            )
+            self.assertEqual(["Exported", "Edited", "Failed"], [volume.status for volume in project.volumes])
+
 
 if __name__ == "__main__":
     unittest.main()

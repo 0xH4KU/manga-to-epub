@@ -88,6 +88,18 @@ class SeriesProject:
         return [volume for volume in self.volumes if volume.volume_number in requested_numbers]
 
     def export_ready(self, output_dir: Path) -> dict[str, int]:
+        summary = {"exported": 0, "failed": 0, "skipped": 0, "warnings": 0}
+        for event in self.export_ready_iter(output_dir):
+            if event["status"] == "summary":
+                summary = {
+                    "exported": event["exported"],
+                    "failed": event["failed"],
+                    "skipped": event["skipped"],
+                    "warnings": event["warnings"],
+                }
+        return summary
+
+    def export_ready_iter(self, output_dir: Path):
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         validation = self.validate_ready(output_dir)
@@ -96,6 +108,9 @@ class SeriesProject:
             if volume.status != "Ready":
                 if volume.status != "Failed":
                     summary["skipped"] += 1
+                    yield _export_event(volume, "skipped")
+                else:
+                    yield _export_event(volume, "failed")
                 continue
             try:
                 model = self.model_for_volume(volume)
@@ -104,11 +119,13 @@ class SeriesProject:
                 volume.status = "Exported"
                 volume.error = None
                 summary["exported"] += 1
+                yield _export_event(volume, "exported")
             except Exception as exc:
                 volume.status = "Failed"
                 volume.error = str(exc)
                 summary["failed"] += 1
-        return summary
+                yield _export_event(volume, "failed")
+        yield {"status": "summary", **summary}
 
     def validate_ready(self, output_dir: Path) -> dict[str, int]:
         return self._validate(output_dir, ready_only=True)
@@ -247,6 +264,14 @@ def _safe_filename(title: str) -> str:
     cleaned = re.sub(r'[\\/:*?"<>|]+', "_", title)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned or "Untitled"
+
+
+def _export_event(volume: SeriesVolume, status: str) -> dict:
+    return {
+        "volume_number": volume.volume_number,
+        "status": status,
+        "output_path": volume.output_path,
+    }
 
 
 def _layout_payload_for_volume(volume: SeriesVolume) -> dict | None:
