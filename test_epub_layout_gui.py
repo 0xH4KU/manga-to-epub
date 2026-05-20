@@ -1390,6 +1390,34 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual(["Page 1", "Blank 2"], [entry.label for entry in app.model.entries])
         self.assertFalse(hasattr(app, "series_refreshed"))
 
+    def test_quick_blank_before_cover_uses_selected_cover_position(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2"), _entry("Page 3")])
+        app.model.cover_source_index = 3
+        app.page_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        app.quick_blank_before_cover()
+
+        self.assertEqual(["Page 1", "Page 2", "Blank 3", "Page 3"], [entry.label for entry in app.model.entries])
+        self.assertEqual(2, app.page_list.selection)
+
+    def test_quick_blank_after_cover_uses_selected_cover_position(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2"), _entry("Page 3")])
+        app.model.cover_source_index = 2
+        app.page_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        app.quick_blank_after_cover()
+
+        self.assertEqual(["Page 1", "Page 2", "Blank 3", "Page 3"], [entry.label for entry in app.model.entries])
+        self.assertEqual(2, app.page_list.selection)
+
     def test_refresh_after_layout_edit_centralizes_selection_preview_and_edit_state(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2")])
@@ -1504,6 +1532,23 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual(0, app.page_list.selection)
         self.assertEqual("Deleted 2 entries: 2 images, 0 blanks.", app.status.value)
 
+    def test_cancelled_group_delete_restores_cover_selection(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = _FakeDeleteModel([_entry("Page 1"), _entry("Page 2"), _entry("Page 3")])
+        app.model.cover_source_index = 2
+        app.page_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.deleted_entries = []
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        with patch("epub_layout_gui.messagebox.askyesno", return_value=False):
+            app.quick_delete_first(2)
+
+        self.assertEqual(["Page 1", "Page 2", "Page 3"], [entry.label for entry in app.model.entries])
+        self.assertEqual(2, app.model.cover_source_index)
+        self.assertEqual([], app.deleted_entries)
+
     def test_recover_last_deleted_restores_grouped_delete(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         page_1 = _entry("Page 1")
@@ -1522,6 +1567,23 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual([], app.deleted_entries)
         self.assertEqual(0, app.page_list.selection)
         self.assertEqual("Recovered 2 pages.", app.status.value)
+
+    def test_recover_last_deleted_restores_cover_selection(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        page_1 = _entry("Page 1")
+        page_2 = _entry("Page 2")
+        app.model = _FakeDeleteModel([page_1])
+        app.model.cover_source_index = 1
+        app.deleted_entries = [[(1, page_2)]]
+        app.deleted_cover_states = [(2, None)]
+        app.page_list = _FakeListbox(selection=0)
+        app.status = _FakeStatus()
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        app.recover_last_deleted()
+
+        self.assertEqual(2, app.model.cover_source_index)
 
     def test_set_selected_as_cover_updates_model_and_status(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

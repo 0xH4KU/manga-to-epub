@@ -481,6 +481,30 @@ class EpubLayoutModelTests(unittest.TestCase):
                     opf,
                 )
 
+    def test_inserted_image_ids_do_not_reuse_after_deletion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            first_image = Path(tmp) / "first.png"
+            second_image = Path(tmp) / "second.png"
+            third_image = Path(tmp) / "third.png"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            first_image.write_bytes(_tiny_png())
+            second_image.write_bytes(_tiny_png())
+            third_image.write_bytes(_tiny_png())
+            model = LayoutModel.from_pdf(pdf_path)
+            model.insert_image(1, first_image)
+            model.insert_image(2, second_image)
+
+            model.delete_entry(1)
+            model.insert_image(2, third_image)
+
+            inserted_ids = [
+                entry.page.item_id
+                for entry in model.entries
+                if entry.source_index is None and not entry.is_blank
+            ]
+            self.assertEqual(["inserted-0002", "inserted-0003"], inserted_ids)
+
     def test_inserted_cover_can_be_excluded_from_reading_pages(self):
         with tempfile.TemporaryDirectory() as tmp:
             pdf_path = Path(tmp) / "comic.pdf"

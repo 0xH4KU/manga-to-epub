@@ -45,6 +45,7 @@ class EpubLayoutApp:
         self._pdf_doc = None
         self._pdf_doc_path: Path | None = None
         self.deleted_entries: list[list[tuple[int, LayoutEntry]]] = []
+        self.deleted_cover_states: list[tuple[int | None, str | None]] = []
         self.ready_status_undo: list[list[tuple[SeriesVolume, str]]] = []
         self.status = tk.StringVar(value="Open a PDF to begin.")
         self.workspace_status = tk.StringVar(value="")
@@ -62,6 +63,12 @@ class EpubLayoutApp:
 
         self._build_ui()
         self._bind_shortcuts()
+
+    def _reset_deleted_history(self) -> None:
+        if not hasattr(self, "deleted_cover_states"):
+            self.deleted_cover_states = []
+        self.deleted_entries.clear()
+        self.deleted_cover_states.clear()
 
     def _configure_window(self) -> None:
         self.root.title("EPUB Layout Lab")
@@ -473,7 +480,7 @@ class EpubLayoutApp:
             self.model = None
             self.pdf_path = None
             self.active_series_volume = None
-            self.deleted_entries.clear()
+            self._reset_deleted_history()
             self.ready_status_undo.clear()
             self._reset_preview_cache()
             self._sync_navigation_mode()
@@ -784,7 +791,7 @@ class EpubLayoutApp:
         self.pdf_path = volume.pdf_path
         self.model = self.series_project.model_for_volume(volume) if self.series_project is not None else None
         self.active_series_volume = volume
-        self.deleted_entries.clear()
+        self._reset_deleted_history()
         self._reset_preview_cache()
         self._load_metadata_fields()
         self.refresh_list()
@@ -800,7 +807,7 @@ class EpubLayoutApp:
         self.series_project = None
         self.active_series_volume = None
         self._sync_navigation_mode()
-        self.deleted_entries.clear()
+        self._reset_deleted_history()
         self._reset_preview_cache()
         self._load_metadata_fields()
         self.refresh_list()
@@ -935,7 +942,7 @@ class EpubLayoutApp:
         if not entry.is_blank and not messagebox.askyesno("Delete page", f"Remove {entry.label} from this export?"):
             return
         try:
-            self.deleted_entries.append([(index, entry)])
+            self._record_deleted_group([(index, entry)])
             self.model.delete_entry(index)
             select_index = min(index, len(self.model.entries) - 1) if self.model.entries else None
             self._refresh_after_layout_edit(select_index=select_index)
@@ -950,7 +957,9 @@ class EpubLayoutApp:
             self.unready_selected()
             return
         group = self.deleted_entries.pop()
+        cover_state = self._pop_deleted_cover_state()
         restored_indexes = self._restore_entries(group)
+        self._restore_cover_state(cover_state)
         self._refresh_after_layout_edit(select_index=restored_indexes[0] if restored_indexes else None)
         if len(group) == 1:
             entry = group[0][1]
@@ -961,15 +970,22 @@ class EpubLayoutApp:
     def quick_blank_before_cover(self) -> None:
         if self.model is None:
             return
-        self.model.insert_blank(0)
-        self._refresh_after_layout_edit(select_index=0)
+        index = self._cover_entry_index()
+        if index is None:
+            index = 0
+        self.model.insert_blank(index)
+        self._refresh_after_layout_edit(select_index=index)
         self.status.set("Inserted one blank page before cover.")
 
     def quick_blank_after_cover(self) -> None:
         if self.model is None:
             return
-        self.model.insert_blank(1)
-        self._refresh_after_layout_edit(select_index=1)
+        index = self._cover_entry_index()
+        if index is None:
+            index = 0
+        index += 1
+        self.model.insert_blank(index)
+        self._refresh_after_layout_edit(select_index=index)
         self.status.set("Inserted one blank page after cover.")
 
     def ask_delete_first(self) -> None:
@@ -1044,6 +1060,7 @@ class EpubLayoutApp:
         if self.model is None:
             return
         try:
+            cover_state = self._capture_cover_state()
             deleted = delete_action()
             if not deleted:
                 return
@@ -1052,8 +1069,9 @@ class EpubLayoutApp:
                 suffix = "" if len(deleted) <= 5 else f", and {len(deleted) - 5} more"
                 if not messagebox.askyesno("Delete pages", f"Remove {labels}{suffix} from this export?"):
                     self._restore_entries(deleted)
+                    self._restore_cover_state(cover_state)
                     return
-            self.deleted_entries.append(deleted)
+            self._record_deleted_group(deleted, cover_state)
             first_deleted = min(index for index, _entry in deleted)
             select_index = min(first_deleted, len(self.model.entries) - 1) if self.model.entries else None
             self._refresh_after_layout_edit(select_index=select_index)
@@ -1070,6 +1088,44 @@ class EpubLayoutApp:
             self.model.entries.insert(index, entry)
             restored_indexes.append(index)
         return restored_indexes
+
+    def _record_deleted_group(
+        self,
+        deleted: list[tuple[int, LayoutEntry]],
+        cover_state: tuple[int | None, str | None] | None = None,
+    ) -> None:
+        if not hasattr(self, "deleted_cover_states"):
+            self.deleted_cover_states = []
+        self.deleted_entries.append(deleted)
+        self.deleted_cover_states.append(cover_state or self._capture_cover_state())
+
+    def _pop_deleted_cover_state(self) -> tuple[int | None, str | None] | None:
+        if not hasattr(self, "deleted_cover_states") or not self.deleted_cover_states:
+            return None
+        return self.deleted_cover_states.pop()
+
+    def _capture_cover_state(self) -> tuple[int | None, str | None]:
+        if self.model is None:
+            return None, None
+        return (
+            getattr(self.model, "cover_source_index", None),
+            getattr(self.model, "cover_entry_id", None),
+        )
+
+    def _restore_cover_state(self, state: tuple[int | None, str | None] | None) -> None:
+        if self.model is None or state is None:
+            return
+        cover_source_index, cover_entry_id = state
+        self.model.cover_source_index = cover_source_index
+        self.model.cover_entry_id = cover_entry_id
+
+    def _cover_entry_index(self) -> int | None:
+        if self.model is None:
+            return None
+        for index, entry in enumerate(self.model.entries):
+            if self._is_cover_entry(entry):
+                return index
+        return None
 
     def _refresh_after_layout_edit(
         self,

@@ -48,6 +48,7 @@ class LayoutModel:
         self.cover_source_index = cover_source_index or self._first_image_source_index()
         self.cover_entry_id = cover_entry_id
         self.exclude_cover_from_reading = exclude_cover_from_reading
+        self._external_image_counter = self._max_external_image_number()
 
     @classmethod
     def from_pdf(cls, pdf_path: Path) -> "LayoutModel":
@@ -272,6 +273,7 @@ class LayoutModel:
         original_entries = list(self.entries)
         self.entries = []
         self._blank_counter = 0
+        self._external_image_counter = 0
         for item in payload.get("entries", []):
             kind = item.get("kind")
             if kind == "source":
@@ -362,8 +364,19 @@ class LayoutModel:
         self.cover_source_index = self._first_image_source_index()
 
     def _next_external_image_number(self) -> int:
-        inserted = [entry.page.item_id for entry in self.entries if entry.source_index is None and not entry.is_blank]
-        return len(inserted) + 1
+        self._external_image_counter += 1
+        return self._external_image_counter
+
+    def _max_external_image_number(self) -> int:
+        maximum = 0
+        for entry in self.entries:
+            if entry.source_index is not None or entry.is_blank:
+                continue
+            prefix = "inserted-"
+            item_id = entry.page.item_id
+            if item_id.startswith(prefix) and item_id[len(prefix) :].isdigit():
+                maximum = max(maximum, int(item_id[len(prefix) :]))
+        return maximum
 
     def _preset_entry_payload(self, entry: LayoutEntry) -> dict:
         if entry.is_blank:
