@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from epub_layout_model import LayoutModel
+from epub_naming import generated_volume_title, infer_volume_number, safe_filename
 
 
 @dataclass
@@ -39,13 +40,13 @@ class SeriesProject:
         sorted_paths = sorted((Path(path) for path in pdf_paths), key=_natural_path_key)
         inferred_title, inferred_author = _infer_series_metadata(sorted_paths)
         volumes = [
-            SeriesVolume(pdf_path=path, volume_number=_volume_number(path, index))
+            SeriesVolume(pdf_path=path, volume_number=infer_volume_number(path, fallback=index))
             for index, path in enumerate(sorted_paths, start=1)
         ]
         return cls(title or inferred_title, author=author or inferred_author, language=language or "zh-Hant", volumes=volumes)
 
     def generated_title(self, volume: SeriesVolume) -> str:
-        return f"{self.title} Vol.{volume.volume_number:02d}"
+        return generated_volume_title(self.title, volume.volume_number)
 
     def model_for_volume(self, volume: SeriesVolume) -> LayoutModel:
         if volume.layout_model is None:
@@ -116,7 +117,7 @@ class SeriesProject:
             try:
                 yield _export_event(volume, "started")
                 model = self.model_for_volume(volume)
-                volume.output_path = output_dir / f"{_safe_filename(self.generated_title(volume))}.epub"
+                volume.output_path = output_dir / f"{safe_filename(self.generated_title(volume))}.epub"
                 model.export_epub(volume.output_path, overwrite=True)
                 volume.status = "Exported"
                 volume.error = None
@@ -143,7 +144,7 @@ class SeriesProject:
             if ready_only and volume.status != "Ready":
                 continue
             volume_number_counts[volume.volume_number] = volume_number_counts.get(volume.volume_number, 0) + 1
-            output_name = f"{_safe_filename(self.generated_title(volume))}.epub"
+            output_name = f"{safe_filename(self.generated_title(volume))}.epub"
             output_name_counts[output_name] = output_name_counts.get(output_name, 0) + 1
 
         baseline_page_count = self._baseline_page_count(ready_only)
@@ -153,7 +154,7 @@ class SeriesProject:
                 continue
             volume.warnings.clear()
             volume.error = None
-            volume.output_path = output_dir / f"{_safe_filename(self.generated_title(volume))}.epub"
+            volume.output_path = output_dir / f"{safe_filename(self.generated_title(volume))}.epub"
             output_name = volume.output_path.name
             if output_name_counts.get(output_name, 0) > 1:
                 volume.warnings.append(f"Output filename collision: {output_name}")
@@ -291,16 +292,6 @@ def _natural_path_key(path: Path) -> list[int | str]:
     return parts
 
 
-def _volume_number(path: Path, fallback: int) -> int:
-    match = re.search(r"\b(?:vol(?:ume)?\.?\s*)(\d+)\b", path.stem, re.IGNORECASE)
-    if match:
-        return int(match.group(1))
-    trailing = re.search(r"(\d+)\s*$", path.stem)
-    if trailing:
-        return int(trailing.group(1))
-    return fallback
-
-
 def _fallback_series_title(paths: list[Path]) -> str:
     if not paths:
         return "Untitled Series"
@@ -328,12 +319,6 @@ def _stem_without_volume(path: Path) -> str:
 
 def _looks_like_split_title(title: str) -> bool:
     return any(separator in title for separator in (",", "，", "、", "：", ":"))
-
-
-def _safe_filename(title: str) -> str:
-    cleaned = re.sub(r'[\\/:*?"<>|]+', "_", title)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned or "Untitled"
 
 
 def _export_event(volume: SeriesVolume, status: str) -> dict:

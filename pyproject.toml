@@ -20,6 +20,8 @@ py-modules = [
   "fitz_compat",
   "epub_writer",
   "epub_validation",
+  "epub_naming",
+  "epub_page_factory",
   "epub_layout_model",
   "epub_batch_model",
   "epub_series_model",

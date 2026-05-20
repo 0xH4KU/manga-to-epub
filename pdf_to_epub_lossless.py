@@ -7,9 +7,11 @@ import argparse
 from pathlib import Path
 
 from epub_layout_model import LayoutModel
+from epub_naming import generated_volume_title, infer_volume_number
+from epub_page_factory import page_from_image
 from epub_validation import validate_epub_structure
 from epub_writer import EpubPage, media_type_for_ext, write_epub_from_pages
-from pdf_to_cbz_lossless import ImageStream, PdfImageError, image_to_archive_member, images_in_pdf_page_order
+from pdf_to_cbz_lossless import ImageStream, PdfImageError, images_in_pdf_page_order
 
 
 _validate_epub_structure = validate_epub_structure
@@ -72,23 +74,9 @@ def _build_pages(
             for blank_index in range(1, blank_pages_before_cover + 1):
                 counts["blank"] = counts.get("blank", 0) + 1
                 pages.append(_blank_page(image, blank_index, "before"))
-        ext, payload = image_to_archive_member(image)
+        page, ext = page_from_image(image, padding)
         counts[ext] = counts.get(ext, 0) + 1
-        page_number = f"{image.index:0{padding}d}"
-        image_href = f"images/page-{page_number}.{ext}"
-        pages.append(
-            EpubPage(
-                index=image.index,
-                width=image.width,
-                height=image.height,
-                image_href=image_href,
-                image_media_type=media_type_for_ext(ext),
-                image_data=payload,
-                xhtml_href=f"xhtml/page-{page_number}.xhtml",
-                item_id=f"page-{image.index:04d}",
-                label=f"Page {image.index}",
-            )
-        )
+        pages.append(page)
         if image.index == 1:
             for blank_index in range(1, blank_pages_after_cover + 1):
                 counts["blank"] = counts.get("blank", 0) + 1
@@ -212,21 +200,9 @@ def _cli_title(pdf_path: Path, args: argparse.Namespace) -> str:
     if args.title:
         return args.title
     if args.series_title:
-        volume_number = args.volume_number if args.volume_number is not None else _infer_volume_number(pdf_path)
-        return f"{args.series_title} Vol.{volume_number:02d}"
+        volume_number = args.volume_number if args.volume_number is not None else infer_volume_number(pdf_path)
+        return generated_volume_title(args.series_title, volume_number)
     return pdf_path.stem
-
-
-def _infer_volume_number(pdf_path: Path) -> int:
-    import re
-
-    match = re.search(r"\b(?:vol(?:ume)?\.?\s*)(\d+)\b", pdf_path.stem, re.IGNORECASE)
-    if match:
-        return int(match.group(1))
-    trailing = re.search(r"(\d+)\s*$", pdf_path.stem)
-    if trailing:
-        return int(trailing.group(1))
-    return 1
 
 
 def _parse_position_path(value: str) -> tuple[int, Path]:

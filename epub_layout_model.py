@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fitz_compat import load_fitz
-from pdf_to_cbz_lossless import ImageStream, PdfImageError, image_to_archive_member, images_in_pdf_page_order
+from pdf_to_cbz_lossless import ImageStream, PdfImageError, images_in_pdf_page_order
+from epub_page_factory import page_from_image
 from epub_writer import EpubPage, media_type_for_ext, write_epub_from_pages
 
 
@@ -396,19 +397,7 @@ class LayoutModel:
 
 
 def _entry_from_image(image: ImageStream, padding: int) -> LayoutEntry:
-    ext, payload = image_to_archive_member(image)
-    page_number = f"{image.index:0{padding}d}"
-    page = EpubPage(
-        index=image.index,
-        width=image.width,
-        height=image.height,
-        image_href=f"images/page-{page_number}.{ext}",
-        image_media_type=media_type_for_ext(ext),
-        image_data=payload,
-        xhtml_href=f"xhtml/page-{page_number}.xhtml",
-        item_id=f"page-{image.index:04d}",
-        label=f"Page {image.index}",
-    )
+    page, _ext = page_from_image(image, padding)
     return LayoutEntry(page.label, page, source_index=image.index)
 
 def _reference_page(entries: list[LayoutEntry], index: int) -> EpubPage:
