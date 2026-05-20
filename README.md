@@ -119,6 +119,44 @@ Export multiple PDFs into a directory:
   --overwrite
 ```
 
+Set EPUB metadata and use source page 2 as cover art only:
+
+```bash
+.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+  --title "Series Vol.01" \
+  --author "Author Name" \
+  --language ja \
+  --cover-page 2 \
+  --cover-only \
+  --overwrite
+```
+
+Apply a GUI layout preset or quick-delete pages without opening the GUI:
+
+```bash
+.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+  --preset ./layout-preset.json \
+  --delete-range 1-3 \
+  --overwrite
+```
+
+Inserted images use `POSITION=PATH` with 1-based spine positions:
+
+```bash
+.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+  --insert-image-after 1=./cover.png \
+  --overwrite
+```
+
+For series-style generated titles, use `--series-title` with either `--volume-number` or a filename that contains a volume number:
+
+```bash
+.venv/bin/python pdf_to_epub_lossless.py "Volume 07.pdf" \
+  --series-title "Series Title" \
+  --volume-number 7 \
+  --overwrite
+```
+
 For OPF spread metadata, `--pair-first-two-pages` explicitly marks the first two source pages as a right-to-left spread pair. `--apple-books` instead writes centered single-page spread metadata for every reading page; these modes are mutually exclusive.
 
 Export CBZ:

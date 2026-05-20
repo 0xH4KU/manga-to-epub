@@ -6,7 +6,7 @@ Current verified baseline:
 
 - `.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_gui_support.py epub_layout_preview.py epub_layout_model.py epub_batch_model.py epub_series_model.py epub_writer.py epub_validation.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py`
 - `.venv/bin/python -m unittest`
-- Result on 2026-05-20: 158 tests passed with the project `.venv`.
+- Result on 2026-05-20: 164 tests passed with the project `.venv`.
 
 Use `.venv/bin/python` for local verification. System `python3` may not have `fitz` / PyMuPDF installed.
 
@@ -283,42 +283,42 @@ Primary files:
 
 Proposed CLI options:
 
-- [ ] `--title TEXT`
-- [ ] `--author TEXT`
-- [ ] `--language CODE`
-- [ ] `--cover-page N`
-- [ ] `--cover-only`
-- [ ] `--preset PATH`
-- [ ] `--insert-image-before POSITION=PATH`
-- [ ] `--insert-image-after POSITION=PATH`
-- [ ] `--delete-first N`
-- [ ] `--delete-last N`
-- [ ] `--delete-range START-END`
-- [ ] `--series-title TEXT`
-- [ ] `--volume-number N` or automatic volume inference
+- [x] `--title TEXT`
+- [x] `--author TEXT`
+- [x] `--language CODE`
+- [x] `--cover-page N`
+- [x] `--cover-only`
+- [x] `--preset PATH`
+- [x] `--insert-image-before POSITION=PATH`
+- [x] `--insert-image-after POSITION=PATH`
+- [x] `--delete-first N`
+- [x] `--delete-last N`
+- [x] `--delete-range START-END`
+- [x] `--series-title TEXT`
+- [x] `--volume-number N` or automatic volume inference
 
 Tasks:
 
-- [ ] Route CLI conversions through `LayoutModel` when layout-changing options are used.
-- [ ] Keep the existing fast direct path for simple conversion if no layout options are supplied.
-- [ ] Validate mutually exclusive options in argparse.
-- [ ] Print a clear summary of layout operations applied.
-- [ ] Document examples in README.
+- [x] Route CLI conversions through `LayoutModel` when layout-changing options are used.
+- [x] Keep the existing fast direct path for simple conversion if no layout options are supplied.
+- [x] Validate mutually exclusive options in argparse.
+- [x] Print a clear summary of layout operations applied.
+- [x] Document examples in README.
 
 Acceptance criteria:
 
-- [ ] CLI can export an EPUB with title, author, language, selected cover, and cover-only behavior.
-- [ ] CLI can apply a v2 preset to a PDF.
-- [ ] CLI can delete first/last/range pages without GUI.
-- [ ] Existing CLI examples continue working.
+- [x] CLI can export an EPUB with title, author, language, selected cover, and cover-only behavior.
+- [x] CLI can apply a v2 preset to a PDF.
+- [x] CLI can delete first/last/range pages without GUI.
+- [x] Existing CLI examples continue working.
 
 Tests:
 
-- [ ] Unit test metadata args appear in OPF.
-- [ ] Unit test invalid cover page fails before writing output.
-- [ ] Unit test `--preset` applies blank/deleted page layout.
-- [ ] Unit test delete range changes spine order and normalized filenames.
-- [ ] Unit test conflicting options produce argparse errors.
+- [x] Unit test metadata args appear in OPF.
+- [x] Unit test invalid cover page fails before writing output.
+- [x] Unit test `--preset` applies blank/deleted page layout.
+- [x] Unit test delete range changes spine order and normalized filenames.
+- [x] Unit test conflicting options produce argparse errors.
 
 ## P1: Preview Performance and Thumbnail Cache
 

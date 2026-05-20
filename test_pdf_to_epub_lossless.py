@@ -1,4 +1,5 @@
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,6 +16,7 @@ from pdf_to_epub_lossless import (
     main,
     write_epub_from_pages,
 )
+from test_epub_layout_model import _four_page_pdf, _tiny_png
 from test_pdf_to_cbz_lossless import _two_page_pdf_with_late_cover
 
 
@@ -142,6 +144,182 @@ class PdfToEpubLosslessTests(unittest.TestCase):
         written = stderr.getvalue()
         self.assertIn("--apple-books", written)
         self.assertIn("--pair-first-two-pages", written)
+
+    def test_cli_metadata_cover_page_and_cover_only_write_opf(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            output_dir = Path(tmp) / "out"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+
+            with patch(
+                "sys.argv",
+                [
+                    "pdf_to_epub_lossless.py",
+                    str(pdf_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--title",
+                    "Comic & More",
+                    "--author",
+                    "A&B Studio",
+                    "--language",
+                    "ja",
+                    "--cover-page",
+                    "2",
+                    "--cover-only",
+                    "--overwrite",
+                ],
+            ):
+                self.assertEqual(0, main())
+
+            epub_path = output_dir / "comic.epub"
+            with ZipFile(epub_path) as archive:
+                opf = archive.read("EPUB/content.opf").decode("utf-8")
+                self.assertIn("<dc:title>Comic &amp; More</dc:title>", opf)
+                self.assertIn("<dc:creator>A&amp;B Studio</dc:creator>", opf)
+                self.assertIn("<dc:language>ja</dc:language>", opf)
+                self.assertIn('id="img-0002" href="images/page-0002.jpg" media-type="image/jpeg" properties="cover-image"', opf)
+                self.assertNotIn('idref="page-0002"', opf)
+
+    def test_cli_invalid_cover_page_fails_before_writing_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            output_dir = Path(tmp) / "out"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+
+            with patch(
+                "sys.argv",
+                [
+                    "pdf_to_epub_lossless.py",
+                    str(pdf_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--cover-page",
+                    "9",
+                ],
+            ):
+                with self.assertRaisesRegex(PdfImageError, "Invalid cover page: 9"):
+                    main()
+
+            self.assertFalse((output_dir / "comic.epub").exists())
+
+    def test_cli_preset_applies_blank_and_deleted_page_layout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            output_dir = Path(tmp) / "out"
+            preset_path = Path(tmp) / "layout.json"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            preset_path.write_text(
+                json.dumps(
+                    {
+                        "version": 2,
+                        "source_page_count": 2,
+                        "metadata": {"title": "Preset Title", "author": "", "language": "zh-Hant"},
+                        "cover": {"kind": "first-image", "source_index": None, "entry_id": None},
+                        "entries": [
+                            {"kind": "source", "source_index": 1},
+                            {"kind": "blank"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch(
+                "sys.argv",
+                [
+                    "pdf_to_epub_lossless.py",
+                    str(pdf_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--preset",
+                    str(preset_path),
+                    "--overwrite",
+                ],
+            ):
+                self.assertEqual(0, main())
+
+            with ZipFile(output_dir / "comic.epub") as archive:
+                names = archive.namelist()
+                self.assertIn("EPUB/xhtml/blank-0001.xhtml", names)
+                self.assertNotIn("EPUB/images/page-0002.jpg", names)
+
+    def test_cli_delete_range_normalizes_exported_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            output_dir = Path(tmp) / "out"
+            pdf_path.write_bytes(_four_page_pdf())
+
+            with patch(
+                "sys.argv",
+                [
+                    "pdf_to_epub_lossless.py",
+                    str(pdf_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--delete-range",
+                    "1-3",
+                    "--overwrite",
+                ],
+            ):
+                self.assertEqual(0, main())
+
+            with ZipFile(output_dir / "comic.epub") as archive:
+                self.assertIn("EPUB/images/page-0001.jpg", archive.namelist())
+                self.assertNotIn("EPUB/images/page-0004.jpg", archive.namelist())
+                nav = archive.read("EPUB/nav.xhtml").decode("utf-8")
+                self.assertIn("Page 4", nav)
+
+    def test_cli_insert_image_after_adds_external_png_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            image_path = Path(tmp) / "extra.png"
+            output_dir = Path(tmp) / "out"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+            image_path.write_bytes(_tiny_png())
+
+            with patch(
+                "sys.argv",
+                [
+                    "pdf_to_epub_lossless.py",
+                    str(pdf_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--insert-image-after",
+                    f"1={image_path}",
+                    "--overwrite",
+                ],
+            ):
+                self.assertEqual(0, main())
+
+            with ZipFile(output_dir / "comic.epub") as archive:
+                self.assertEqual(_tiny_png(), archive.read("EPUB/images/page-0002.png"))
+
+    def test_cli_series_title_and_volume_number_generate_title(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            output_dir = Path(tmp) / "out"
+            pdf_path.write_bytes(_two_page_pdf_with_late_cover())
+
+            with patch(
+                "sys.argv",
+                [
+                    "pdf_to_epub_lossless.py",
+                    str(pdf_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--series-title",
+                    "Series",
+                    "--volume-number",
+                    "7",
+                    "--overwrite",
+                ],
+            ):
+                self.assertEqual(0, main())
+
+            with ZipFile(output_dir / "comic.epub") as archive:
+                opf = archive.read("EPUB/content.opf").decode("utf-8")
+                self.assertIn("<dc:title>Series Vol.07</dc:title>", opf)
 
     def test_epub_writes_author_language_and_selected_cover(self):
         with tempfile.TemporaryDirectory() as tmp:
