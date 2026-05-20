@@ -873,7 +873,7 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         project = SimpleNamespace(
             exported_to=None,
             export_ready=lambda output_dir: setattr(project, "exported_to", output_dir)
-            or {"exported": 1, "failed": 0, "skipped": 2},
+            or {"exported": 1, "failed": 0, "skipped": 2, "warnings": 3},
         )
         app.series_project = project
 
@@ -883,7 +883,7 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         self.assertEqual(Path("/tmp/out"), project.exported_to)
         self.assertTrue(app.series_refreshed)
         self.assertTrue(app.workspace_refreshed)
-        self.assertEqual("Series exported 1 volumes; 0 failed, 2 skipped.", app.status.value)
+        self.assertEqual("Series exported 1 volumes; 0 failed, 2 skipped, 3 warnings.", app.status.value)
 
     def test_bind_shortcuts_registers_safe_layout_actions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

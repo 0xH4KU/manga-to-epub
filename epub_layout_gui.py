@@ -604,7 +604,8 @@ class EpubLayoutApp:
         self.refresh_workspace_status()
         self.status.set(
             f"Series exported {summary['exported']} volumes; "
-            f"{summary['failed']} failed, {summary['skipped']} skipped."
+            f"{summary['failed']} failed, {summary['skipped']} skipped, "
+            f"{summary.get('warnings', 0)} warnings."
         )
 
     def _load_series_volume(self, volume: SeriesVolume) -> None:

@@ -100,7 +100,7 @@ class EpubSeriesModelTests(unittest.TestCase):
 
             summary = project.export_ready(output_dir)
 
-            self.assertEqual({"exported": 1, "failed": 0, "skipped": 2}, summary)
+            self.assertEqual({"exported": 1, "failed": 0, "skipped": 2, "warnings": 0}, summary)
             self.assertEqual(["Exported", "Edited", "Unreviewed"], [volume.status for volume in project.volumes])
             exported_path = output_dir / "晚安,布布 Vol.01.epub"
             self.assertTrue(exported_path.exists())
@@ -199,6 +199,52 @@ class EpubSeriesModelTests(unittest.TestCase):
             self.assertEqual("../pdfs/Series Vol.01.pdf", payload["volumes"][0]["pdf_path"])
             restored = SeriesProject.from_payload(payload, project_path)
             self.assertEqual(pdf_path, restored.volumes[0].pdf_path)
+
+    def test_validate_all_reports_duplicate_volumes_missing_pdfs_and_filename_collisions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            existing_pdf = Path(tmp) / "Series Vol.01.pdf"
+            missing_pdf = Path(tmp) / "Missing Vol.01.pdf"
+            output_dir = Path(tmp) / "out"
+            existing_pdf.write_bytes(_two_page_pdf_with_late_cover())
+            project = SeriesProject.from_pdfs([existing_pdf], title="Series")
+            duplicate = type(project.volumes[0])(
+                pdf_path=missing_pdf,
+                volume_number=1,
+                status="Ready",
+            )
+            project.volumes.append(duplicate)
+
+            summary = project.validate_all(output_dir)
+
+            self.assertEqual({"ready": 1, "failed": 1, "warnings": 2}, summary)
+            self.assertEqual(["Output filename collision: Series Vol.01.epub", "Duplicate volume number: 1"], project.volumes[0].warnings)
+            self.assertEqual(["Output filename collision: Series Vol.01.epub", "Duplicate volume number: 1"], project.volumes[1].warnings)
+            self.assertEqual("Failed", project.volumes[1].status)
+            self.assertIn("Source PDF not found", project.volumes[1].error)
+
+    def test_export_ready_validates_and_skips_failed_volumes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ready_pdf = Path(tmp) / "Series Vol.01.pdf"
+            missing_pdf = Path(tmp) / "Series Vol.02.pdf"
+            output_dir = Path(tmp) / "out"
+            ready_pdf.write_bytes(_two_page_pdf_with_late_cover())
+            project = SeriesProject.from_pdfs([ready_pdf], title="Series")
+            project.volumes[0].status = "Ready"
+            project.volumes.append(
+                type(project.volumes[0])(
+                    pdf_path=missing_pdf,
+                    volume_number=2,
+                    status="Ready",
+                )
+            )
+
+            summary = project.export_ready(output_dir)
+
+            self.assertEqual({"exported": 1, "failed": 1, "skipped": 0, "warnings": 0}, summary)
+            self.assertTrue((output_dir / "Series Vol.01.epub").exists())
+            self.assertEqual("Exported", project.volumes[0].status)
+            self.assertEqual("Failed", project.volumes[1].status)
+            self.assertIn("Source PDF not found", project.volumes[1].error)
 
 
 if __name__ == "__main__":

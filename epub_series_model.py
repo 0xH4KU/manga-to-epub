@@ -90,10 +90,12 @@ class SeriesProject:
     def export_ready(self, output_dir: Path) -> dict[str, int]:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        summary = {"exported": 0, "failed": 0, "skipped": 0}
+        validation = self.validate_ready(output_dir)
+        summary = {"exported": 0, "failed": validation["failed"], "skipped": 0, "warnings": validation["warnings"]}
         for volume in self.volumes:
             if volume.status != "Ready":
-                summary["skipped"] += 1
+                if volume.status != "Failed":
+                    summary["skipped"] += 1
                 continue
             try:
                 model = self.model_for_volume(volume)
@@ -106,6 +108,45 @@ class SeriesProject:
                 volume.status = "Failed"
                 volume.error = str(exc)
                 summary["failed"] += 1
+        return summary
+
+    def validate_ready(self, output_dir: Path) -> dict[str, int]:
+        return self._validate(output_dir, ready_only=True)
+
+    def validate_all(self, output_dir: Path) -> dict[str, int]:
+        return self._validate(output_dir, ready_only=False)
+
+    def _validate(self, output_dir: Path, ready_only: bool) -> dict[str, int]:
+        output_dir = Path(output_dir)
+        volume_number_counts: dict[int, int] = {}
+        output_name_counts: dict[str, int] = {}
+        for volume in self.volumes:
+            if ready_only and volume.status != "Ready":
+                continue
+            volume_number_counts[volume.volume_number] = volume_number_counts.get(volume.volume_number, 0) + 1
+            output_name = f"{_safe_filename(self.generated_title(volume))}.epub"
+            output_name_counts[output_name] = output_name_counts.get(output_name, 0) + 1
+
+        summary = {"ready": 0, "failed": 0, "warnings": 0}
+        for volume in self.volumes:
+            if ready_only and volume.status != "Ready":
+                continue
+            volume.warnings.clear()
+            volume.error = None
+            volume.output_path = output_dir / f"{_safe_filename(self.generated_title(volume))}.epub"
+            output_name = volume.output_path.name
+            if output_name_counts.get(output_name, 0) > 1:
+                volume.warnings.append(f"Output filename collision: {output_name}")
+            if volume_number_counts.get(volume.volume_number, 0) > 1:
+                volume.warnings.append(f"Duplicate volume number: {volume.volume_number}")
+            if not volume.pdf_path.exists():
+                volume.status = "Failed"
+                volume.error = f"Source PDF not found: {volume.pdf_path}"
+                summary["failed"] += 1
+            else:
+                summary["ready"] += 1
+            if volume.warnings:
+                summary["warnings"] += 1
         return summary
 
     def to_payload(self, project_path: Path | None = None) -> dict:
