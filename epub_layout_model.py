@@ -5,10 +5,12 @@ import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 
-import fitz
-
+from fitz_compat import load_fitz
 from pdf_to_cbz_lossless import ImageStream, PdfImageError, image_to_archive_member, images_in_pdf_page_order
 from epub_writer import EpubPage, media_type_for_ext, write_epub_from_pages
+
+
+fitz = load_fitz()
 
 
 @dataclass(frozen=True)

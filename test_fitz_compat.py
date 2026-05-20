@@ -1,0 +1,16 @@
+import unittest
+from unittest.mock import patch
+
+import fitz_compat
+from pdf_to_cbz_lossless import PdfImageError
+
+
+class FitzCompatTests(unittest.TestCase):
+    def test_missing_pymupdf_error_mentions_install_command(self):
+        with patch("fitz_compat.importlib.import_module", side_effect=ModuleNotFoundError("fitz")):
+            with self.assertRaisesRegex(PdfImageError, r"\.venv/bin/python -m pip install -r requirements\.txt"):
+                fitz_compat.load_fitz()
+
+
+if __name__ == "__main__":
+    unittest.main()

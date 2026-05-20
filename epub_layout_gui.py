@@ -9,8 +9,7 @@ import json
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-import fitz
-
+from fitz_compat import load_fitz
 from epub_layout_model import LayoutEntry, LayoutModel
 from epub_layout_gui_support import (
     AppCommand,
@@ -28,6 +27,9 @@ from epub_layout_preview import (
     thumbnail_cache_key,
 )
 from epub_series_model import SeriesProject, SeriesVolume
+
+
+fitz = load_fitz()
 
 
 class EpubLayoutApp:

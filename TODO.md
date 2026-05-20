@@ -4,9 +4,9 @@ This roadmap keeps the project focused on its current niche: lossless fixed-layo
 
 Current verified baseline:
 
-- `.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_gui_support.py epub_layout_preview.py epub_layout_model.py epub_batch_model.py epub_series_model.py epub_writer.py epub_validation.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py`
+- `.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_gui_support.py epub_layout_preview.py epub_layout_model.py epub_batch_model.py epub_series_model.py epub_writer.py epub_validation.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py fitz_compat.py`
 - `.venv/bin/python -m unittest`
-- Result on 2026-05-20: 176 tests passed with the project `.venv`.
+- Result on 2026-05-20: 177 tests passed with the project `.venv`.
 
 Use `.venv/bin/python` for local verification. System `python3` may not have `fitz` / PyMuPDF installed.
 
@@ -509,22 +509,22 @@ Files:
 
 Tasks:
 
-- [ ] Add `make setup`, `make test`, `make lint` or equivalent.
-- [ ] Add a clear error path when `fitz` is missing from GUI imports.
+- [x] Add `make setup`, `make test`, `make lint` or equivalent.
+- [x] Add a clear error path when `fitz` is missing from GUI imports.
 - [ ] Add optional formatting/linting config if desired.
-- [ ] Add GitHub Actions for Python 3.11+.
-- [ ] Add a tiny smoke test command for CLI conversion.
+- [x] Add GitHub Actions for Python 3.11+.
+- [x] Add a tiny smoke test command for CLI conversion.
 
 Acceptance criteria:
 
-- [ ] New contributor can run one documented command to create venv and install requirements.
-- [ ] CI runs py_compile and unittest.
-- [ ] Dependency-missing errors explain `.venv/bin/python -m pip install -r requirements.txt`.
+- [x] New contributor can run one documented command to create venv and install requirements.
+- [x] CI runs py_compile and unittest.
+- [x] Dependency-missing errors explain `.venv/bin/python -m pip install -r requirements.txt`.
 
 Tests:
 
-- [ ] CI must pass py_compile and unittest.
-- [ ] Manual smoke test documented in README.
+- [x] CI must pass py_compile and unittest.
+- [x] Manual smoke test documented in README.
 
 ## P3: PDF Compatibility Expansion
 

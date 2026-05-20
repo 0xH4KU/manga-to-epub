@@ -43,6 +43,12 @@ Use Python 3.11 or newer. Tkinter is included with the standard Python.org macOS
 
 ```bash
 cd /Users/HAKU/github/manga-pdf-to-epub
+make setup
+```
+
+The equivalent manual setup is:
+
+```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -U pip
 .venv/bin/python -m pip install -r requirements.txt
@@ -196,8 +202,13 @@ For Flate-compressed PDF image streams, the tool wraps the image data into PNG. 
 ## Test
 
 ```bash
-.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_gui_support.py epub_layout_preview.py epub_layout_model.py epub_batch_model.py epub_series_model.py epub_writer.py epub_validation.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py
-.venv/bin/python -m unittest
+make test
+```
+
+Smoke-check the CLI entrypoints:
+
+```bash
+make smoke
 ```
 
 ## Limitations
