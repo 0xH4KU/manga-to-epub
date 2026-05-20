@@ -133,14 +133,12 @@ def _content_opf(
     creator_xml = html.escape(author, quote=True) if author else None
     cover_id = cover_item_id or _first_image_item_id(pages)
     image_items = "\n".join(
-        f'    <item id="img-{page.index:04d}" href="{page.image_href}" media-type="{page.image_media_type}"'
-        f'{" properties=\"cover-image\"" if page.item_id == cover_id else ""}/>'
+        _image_manifest_item(page, cover_id)
         for page in pages
         if not page.is_blank
     )
     xhtml_items = "\n".join(
-        f'    <item id="{page.item_id}" href="{page.xhtml_href}" media-type="application/xhtml+xml"'
-        f'{" properties=\"svg\"" if not page.is_blank else ""}/>'
+        _xhtml_manifest_item(page)
         for page in reading_pages
     )
     spread = "none" if apple_books else "auto"
@@ -174,6 +172,16 @@ def _content_opf(
   </spine>
 </package>
 """
+
+
+def _image_manifest_item(page: EpubPage, cover_id: str | None) -> str:
+    properties = ' properties="cover-image"' if page.item_id == cover_id else ""
+    return f'    <item id="img-{page.index:04d}" href="{page.image_href}" media-type="{page.image_media_type}"{properties}/>'
+
+
+def _xhtml_manifest_item(page: EpubPage) -> str:
+    properties = ' properties="svg"' if not page.is_blank else ""
+    return f'    <item id="{page.item_id}" href="{page.xhtml_href}" media-type="application/xhtml+xml"{properties}/>'
 
 
 def _first_image_item_id(pages: list[EpubPage]) -> str | None:
