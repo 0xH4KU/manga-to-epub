@@ -599,7 +599,13 @@ class EpubLayoutApp:
         if not output_dir_name:
             return
         output_dir = Path(output_dir_name)
-        summary = self.series_project.export_ready(output_dir)
+        self._run_background(
+            "Exporting ready series...",
+            lambda: self.series_project.export_ready(output_dir),
+            self._series_export_done,
+        )
+
+    def _series_export_done(self, summary: dict[str, int]) -> None:
         self.refresh_series_list()
         self.refresh_workspace_status()
         self.status.set(
