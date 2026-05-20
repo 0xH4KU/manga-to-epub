@@ -976,6 +976,8 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         events = [{"status": "summary", "exported": 1, "failed": 0, "skipped": 2, "warnings": 3}]
         project = SimpleNamespace(
             exported_to=None,
+            volumes=[],
+            validate_ready=lambda output_dir: {"ready": 1, "failed": 0, "warnings": 0},
             export_ready_iter=lambda output_dir: setattr(project, "exported_to", output_dir) or iter(events),
         )
         app.series_project = project
@@ -997,6 +999,8 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.root = _FakeRoot()
         events = [{"status": "summary", "exported": 1, "failed": 0, "skipped": 0, "warnings": 0}]
         project = SimpleNamespace(
+            volumes=[],
+            validate_ready=lambda output_dir: {"ready": 1, "failed": 0, "warnings": 0},
             export_ready_iter=lambda output_dir: iter(events),
         )
         app.series_project = project
@@ -1021,7 +1025,11 @@ class EpubLayoutGuiListTests(unittest.TestCase):
             {"volume_number": 1, "status": "exported", "output_path": Path("/tmp/out/Series Vol.01.epub")},
             {"status": "summary", "exported": 1, "failed": 0, "skipped": 0, "warnings": 0},
         ]
-        project = SimpleNamespace(export_ready_iter=lambda output_dir: iter(events))
+        project = SimpleNamespace(
+            volumes=[],
+            validate_ready=lambda output_dir: {"ready": 1, "failed": 0, "warnings": 0},
+            export_ready_iter=lambda output_dir: iter(events),
+        )
         app.series_project = project
         app._run_background = lambda status, work, on_success: setattr(app, "background_call", (status, work, on_success)) or True
 
@@ -1041,7 +1049,11 @@ class EpubLayoutGuiListTests(unittest.TestCase):
         app.refresh_workspace_status = lambda: None
         app.root = _FakeRoot()
         events = [{"status": "summary", "exported": 1, "failed": 0, "skipped": 0, "warnings": 0}]
-        app.series_project = SimpleNamespace(export_ready_iter=lambda output_dir: iter(events))
+        app.series_project = SimpleNamespace(
+            volumes=[],
+            validate_ready=lambda output_dir: {"ready": 1, "failed": 0, "warnings": 0},
+            export_ready_iter=lambda output_dir: iter(events),
+        )
         app._run_background = lambda status, work, on_success: setattr(app, "background_call", (status, work, on_success)) or True
 
         with patch("epub_layout_gui.filedialog.askdirectory", return_value="/tmp/out"):
@@ -1072,6 +1084,30 @@ class EpubLayoutGuiListTests(unittest.TestCase):
             app.export_ready_series()
 
         self.assertEqual("Another operation is already running.", app.status.value)
+
+    def test_export_ready_series_shows_warning_summary_before_background_export(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.status = _FakeStatus()
+        app.root = _FakeRoot()
+        app.output_dir = Path("/tmp")
+        volume = SimpleNamespace(volume_number=1, status="Ready", warnings=["check page count"], error=None)
+        project = SimpleNamespace(
+            volumes=[volume],
+            validate_ready=lambda output_dir: {"ready": 1, "failed": 0, "warnings": 1},
+            export_ready_iter=lambda output_dir: iter([{"status": "summary", "exported": 1, "failed": 0, "skipped": 0, "warnings": 1}]),
+        )
+        app.series_project = project
+        app._run_background = lambda status, work, on_success: setattr(app, "background_call", (status, work, on_success)) or True
+        app._open_series_export_progress = lambda: setattr(app, "progress_opened", True)
+
+        with patch("epub_layout_gui.filedialog.askdirectory", return_value="/tmp/out"):
+            with patch("epub_layout_gui.messagebox.showwarning") as showwarning:
+                app.export_ready_series()
+
+        showwarning.assert_called_once()
+        self.assertIn("Vol.01: check page count", showwarning.call_args.args[1])
+        self.assertTrue(app.progress_opened)
+        self.assertEqual("Exporting ready series...", app.background_call[0])
 
     def test_bind_shortcuts_registers_safe_layout_actions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

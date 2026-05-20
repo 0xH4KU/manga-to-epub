@@ -627,6 +627,9 @@ class EpubLayoutApp:
     def export_ready_series(self) -> None:
         if self.series_project is None:
             return
+        if getattr(self, "_busy", False):
+            self.status.set("Another operation is already running.")
+            return
         output_dir_name = filedialog.askdirectory(
             title="Series output directory",
             initialdir=str(getattr(self, "output_dir", Path.cwd())),
@@ -634,6 +637,10 @@ class EpubLayoutApp:
         if not output_dir_name:
             return
         output_dir = Path(output_dir_name)
+        self.series_project.validate_ready(output_dir)
+        warning_lines = self._series_warning_lines()
+        if warning_lines:
+            messagebox.showwarning("Series validation warnings", "\n".join(warning_lines))
         self._open_series_export_progress()
         self._run_background(
             "Exporting ready series...",

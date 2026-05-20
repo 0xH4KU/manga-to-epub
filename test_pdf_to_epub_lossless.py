@@ -566,6 +566,113 @@ class PdfToEpubLosslessTests(unittest.TestCase):
             with self.assertRaisesRegex(PdfImageError, "Image media type mismatch for EPUB/images/page-0001.png"):
                 _validate_epub_structure(epub_path)
 
+    def test_structure_validation_rejects_missing_reading_page_image_manifest_item(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            epub_path = Path(tmp) / "broken.epub"
+            with ZipFile(epub_path, "w") as archive:
+                archive.writestr("mimetype", b"application/epub+zip")
+                archive.writestr("META-INF/container.xml", b"<container/>")
+                archive.writestr("EPUB/nav.xhtml", b'<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja"/>')
+                archive.writestr(
+                    "EPUB/xhtml/page-0001.xhtml",
+                    b"""<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+  <body>
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <image href="../images/missing.jpg"/>
+    </svg>
+  </body>
+</html>""",
+                )
+                archive.writestr(
+                    "EPUB/content.opf",
+                    """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:language>ja</dc:language>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="page-0001" href="xhtml/page-0001.xhtml" media-type="application/xhtml+xml" properties="svg"/>
+  </manifest>
+  <spine><itemref idref="page-0001"/></spine>
+</package>
+""",
+                )
+
+            with self.assertRaisesRegex(PdfImageError, "Reading page image missing from manifest: EPUB/images/missing.jpg"):
+                _validate_epub_structure(epub_path)
+
+    def test_structure_validation_rejects_cover_image_counts_other_than_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            no_cover = Path(tmp) / "no-cover.epub"
+            two_covers = Path(tmp) / "two-covers.epub"
+
+            def write_epub(path: Path, image_items: str) -> None:
+                with ZipFile(path, "w") as archive:
+                    archive.writestr("mimetype", b"application/epub+zip")
+                    archive.writestr("META-INF/container.xml", b"<container/>")
+                    archive.writestr("EPUB/nav.xhtml", b'<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja"/>')
+                    archive.writestr("EPUB/xhtml/page-0001.xhtml", b'<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja"/>')
+                    archive.writestr("EPUB/images/page-0001.jpg", b"JPG")
+                    archive.writestr("EPUB/images/page-0002.jpg", b"JPG")
+                    archive.writestr(
+                        "EPUB/content.opf",
+                        f"""<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:language>ja</dc:language>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    {image_items}
+    <item id="page-0001" href="xhtml/page-0001.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="page-0001"/></spine>
+</package>
+""",
+                    )
+
+            write_epub(no_cover, '<item id="img-0001" href="images/page-0001.jpg" media-type="image/jpeg"/>')
+            write_epub(
+                two_covers,
+                """<item id="img-0001" href="images/page-0001.jpg" media-type="image/jpeg" properties="cover-image"/>
+    <item id="img-0002" href="images/page-0002.jpg" media-type="image/jpeg" properties="cover-image"/>""",
+            )
+
+            with self.assertRaisesRegex(PdfImageError, "EPUB must have exactly one cover image"):
+                _validate_epub_structure(no_cover)
+            with self.assertRaisesRegex(PdfImageError, "EPUB must have exactly one cover image"):
+                _validate_epub_structure(two_covers)
+
+    def test_structure_validation_rejects_inconsistent_xhtml_language(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            epub_path = Path(tmp) / "broken.epub"
+            with ZipFile(epub_path, "w") as archive:
+                archive.writestr("mimetype", b"application/epub+zip")
+                archive.writestr("META-INF/container.xml", b"<container/>")
+                archive.writestr("EPUB/nav.xhtml", b'<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"/>')
+                archive.writestr("EPUB/xhtml/page-0001.xhtml", b'<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja"/>')
+                archive.writestr("EPUB/images/page-0001.jpg", b"JPG")
+                archive.writestr(
+                    "EPUB/content.opf",
+                    """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:language>ja</dc:language>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="img-0001" href="images/page-0001.jpg" media-type="image/jpeg" properties="cover-image"/>
+    <item id="page-0001" href="xhtml/page-0001.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="page-0001"/></spine>
+</package>
+""",
+                )
+
+            with self.assertRaisesRegex(PdfImageError, "XHTML language mismatch for EPUB/nav.xhtml"):
+                _validate_epub_structure(epub_path)
+
     def test_language_propagates_to_nav_and_page_xhtml(self):
         with tempfile.TemporaryDirectory() as tmp:
             epub_path = Path(tmp) / "comic.epub"
