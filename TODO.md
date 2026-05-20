@@ -6,7 +6,7 @@ Current verified baseline:
 
 - `.venv/bin/python -m py_compile epub_layout_gui.py epub_layout_gui_support.py epub_layout_preview.py epub_layout_model.py epub_batch_model.py epub_series_model.py epub_writer.py epub_validation.py pdf_to_epub_lossless.py pdf_to_cbz_lossless.py`
 - `.venv/bin/python -m unittest`
-- Result on 2026-05-20: 169 tests passed with the project `.venv`.
+- Result on 2026-05-20: 174 tests passed with the project `.venv`.
 
 Use `.venv/bin/python` for local verification. System `python3` may not have `fitz` / PyMuPDF installed.
 
@@ -337,26 +337,26 @@ Primary files:
 
 Tasks:
 
-- [ ] Replace plain dict thumbnail cache with a bounded LRU cache.
-- [ ] Normalize preview render size into buckets to reduce cache fragmentation.
-- [ ] Reuse an open `fitz.Document` per active volume, closing it when switching PDFs.
+- [x] Replace plain dict thumbnail cache with a bounded LRU cache.
+- [x] Normalize preview render size into buckets to reduce cache fragmentation.
+- [x] Reuse an open `fitz.Document` per active volume, closing it when switching PDFs.
 - [ ] Preload previous/next spread thumbnails after current preview renders.
-- [ ] Add a status message when preview rendering fails for a page.
-- [ ] Add cache clearing when volume changes, project closes, or source file changes.
+- [x] Add a status message when preview rendering fails for a page.
+- [x] Add cache clearing when volume changes, project closes, or source file changes.
 
 Acceptance criteria:
 
-- [ ] Repeated preview navigation does not repeatedly open the same PDF.
-- [ ] Cache memory remains bounded.
-- [ ] Switching volumes closes stale documents and clears stale thumbnails.
+- [x] Repeated preview navigation does not repeatedly open the same PDF.
+- [x] Cache memory remains bounded.
+- [x] Switching volumes closes stale documents and clears stale thumbnails.
 - [ ] Inserted image previews still render correctly.
 
 Tests:
 
-- [ ] Unit test LRU eviction.
-- [ ] Unit test cache key bucketing.
-- [ ] Unit test PDF document handle is reused for same source.
-- [ ] Unit test document/cache reset on volume switch.
+- [x] Unit test LRU eviction.
+- [x] Unit test cache key bucketing.
+- [x] Unit test PDF document handle is reused for same source.
+- [x] Unit test document/cache reset on volume switch.
 
 ## P1: EPUB Validation Upgrades
 

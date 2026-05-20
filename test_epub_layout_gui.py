@@ -1107,6 +1107,46 @@ class EpubLayoutGuiListTests(unittest.TestCase):
 
         self.assertEqual(("entry", "inserted-0001", 100, 200), app._thumbnail_cache_key(entry, 100, 200))
 
+    def test_thumbnail_for_page_reuses_open_pdf_document(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.pdf_path = Path("/tmp/book.pdf")
+        app.thumbnail_cache = {}
+        fake_page = SimpleNamespace(
+            rect=SimpleNamespace(width=100, height=200),
+            get_pixmap=lambda matrix, alpha: SimpleNamespace(tobytes=lambda fmt: b"PNG"),
+        )
+
+        class FakeDoc:
+            def __getitem__(self, index):
+                return fake_page
+
+            def close(self):
+                app.closed_doc = True
+
+        app._pdf_doc = FakeDoc()
+        app._pdf_doc_path = app.pdf_path
+
+        with patch("epub_layout_gui.tk.PhotoImage", return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20)) as photo:
+            first = app._thumbnail_for_page(1, 120, 180)
+            second = app._thumbnail_for_page(1, 121, 181)
+
+        self.assertIs(first, second)
+        photo.assert_called_once()
+
+    def test_reset_preview_cache_closes_open_document_and_clears_thumbnails(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.thumbnail_cache = {"old": object()}
+        app._pdf_doc_path = Path("/tmp/book.pdf")
+        app.closed = False
+        app._pdf_doc = SimpleNamespace(close=lambda: setattr(app, "closed", True))
+
+        app._reset_preview_cache()
+
+        self.assertEqual({}, app.thumbnail_cache)
+        self.assertIsNone(app._pdf_doc)
+        self.assertIsNone(app._pdf_doc_path)
+        self.assertTrue(app.closed)
+
     def test_refresh_list_can_preserve_scroll_position(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.model = SimpleNamespace(entries=[_entry(f"Page {index}") for index in range(1, 8)])

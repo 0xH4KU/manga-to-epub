@@ -20,6 +20,8 @@ from epub_layout_gui_support import (
     event_from_text_input,
 )
 from epub_layout_preview import (
+    ThumbnailCache,
+    normalize_preview_size,
     preview_entries,
     preview_index_for_selection,
     spread_slots,
@@ -37,7 +39,9 @@ class EpubLayoutApp:
         self.pdf_path: Path | None = None
         self.output_dir = Path.cwd() / "epub_layout_gui_exports"
         self.photo_refs: list[tk.PhotoImage] = []
-        self.thumbnail_cache: dict[int, tk.PhotoImage] = {}
+        self.thumbnail_cache: ThumbnailCache = ThumbnailCache()
+        self._pdf_doc = None
+        self._pdf_doc_path: Path | None = None
         self.deleted_entries: list[list[tuple[int, LayoutEntry]]] = []
         self.ready_status_undo: list[list[tuple[SeriesVolume, str]]] = []
         self.status = tk.StringVar(value="Open a PDF to begin.")
@@ -461,7 +465,7 @@ class EpubLayoutApp:
             self.active_series_volume = None
             self.deleted_entries.clear()
             self.ready_status_undo.clear()
-            self.thumbnail_cache.clear()
+            self._reset_preview_cache()
             self._sync_navigation_mode()
             self._load_metadata_fields()
             self.refresh_series_list()
@@ -694,7 +698,7 @@ class EpubLayoutApp:
         self.model = self.series_project.model_for_volume(volume) if self.series_project is not None else None
         self.active_series_volume = volume
         self.deleted_entries.clear()
-        self.thumbnail_cache.clear()
+        self._reset_preview_cache()
         self._load_metadata_fields()
         self.refresh_list()
         self.page_list.selection_clear(0, tk.END)
@@ -710,7 +714,7 @@ class EpubLayoutApp:
         self.active_series_volume = None
         self._sync_navigation_mode()
         self.deleted_entries.clear()
-        self.thumbnail_cache.clear()
+        self._reset_preview_cache()
         self._load_metadata_fields()
         self.refresh_list()
         self.page_list.selection_clear(0, tk.END)
@@ -1268,20 +1272,50 @@ class EpubLayoutApp:
     def _thumbnail_for_page(self, page_index: int, max_w: int, max_h: int) -> tk.PhotoImage | None:
         if self.pdf_path is None:
             return None
-        cache_key = (page_index, max_w, max_h)
+        bucket_w, bucket_h = normalize_preview_size(max_w, max_h)
+        cache_key = ("pdf", page_index, bucket_w, bucket_h)
         cached = self.thumbnail_cache.get(cache_key)
         if cached is not None:
             return cached
         try:
-            with fitz.open(self.pdf_path) as doc:
-                page = doc[page_index - 1]
-                zoom = min(max_w / page.rect.width, max_h / page.rect.height)
-                pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
-                image = tk.PhotoImage(data=pix.tobytes("png"))
-                self.thumbnail_cache[cache_key] = image
-                return image
+            doc = self._pdf_document()
+            page = doc[page_index - 1]
+            zoom = min(max_w / page.rect.width, max_h / page.rect.height)
+            pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+            image = tk.PhotoImage(data=pix.tobytes("png"))
+            self.thumbnail_cache[cache_key] = image
+            return image
         except Exception:
+            if hasattr(self, "status"):
+                self.status.set(f"Preview failed for page {page_index}.")
             return None
+
+    def _pdf_document(self):
+        if self.pdf_path is None:
+            return None
+        if getattr(self, "_pdf_doc", None) is not None and self._pdf_doc_path == self.pdf_path:
+            return self._pdf_doc
+        self._close_pdf_document()
+        self._pdf_doc = fitz.open(self.pdf_path)
+        self._pdf_doc_path = self.pdf_path
+        return self._pdf_doc
+
+    def _close_pdf_document(self) -> None:
+        doc = getattr(self, "_pdf_doc", None)
+        if doc is not None:
+            try:
+                doc.close()
+            except Exception:
+                pass
+        self._pdf_doc = None
+        self._pdf_doc_path = None
+
+    def _reset_preview_cache(self) -> None:
+        if not isinstance(getattr(self, "thumbnail_cache", None), ThumbnailCache):
+            self.thumbnail_cache = ThumbnailCache()
+        else:
+            self.thumbnail_cache.clear()
+        self._close_pdf_document()
 
     def _thumbnail_for_entry(self, entry, max_w: int, max_h: int) -> tk.PhotoImage | None:
         cache_key = self._thumbnail_cache_key(entry, max_w, max_h)
