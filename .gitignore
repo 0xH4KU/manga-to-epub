@@ -6,6 +6,7 @@ __pycache__/
 .mypy_cache/
 *.egg-info/
 .superpowers/
+FUTURE_PLAN.md
 
 # Local source books and generated output
 *.pdf
