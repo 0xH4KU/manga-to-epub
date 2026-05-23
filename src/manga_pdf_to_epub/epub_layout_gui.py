@@ -10,6 +10,12 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from .fitz_compat import load_fitz
+from .epub_layout_commands import app_commands
+from .epub_layout_diagnosis_controller import (
+    build_diagnosis_tab,
+    initialize_diagnosis_state,
+    reset_diagnosis_for_model,
+)
 from .epub_layout_history import CoverState, DeleteHistory
 from .epub_layout_model import LayoutEntry, LayoutModel
 from .epub_layout_gui_support import (
@@ -61,6 +67,7 @@ class EpubLayoutApp:
         self.active_series_volume: SeriesVolume | None = None
         self._busy = False
         self._page_drag_source: int | None = None
+        initialize_diagnosis_state(self)
 
         self._build_ui()
         self._bind_shortcuts()
@@ -74,8 +81,8 @@ class EpubLayoutApp:
         self.root.minsize(1100, 680)
 
     @staticmethod
-    def _inspector_tab_titles() -> tuple[str, str, str]:
-        return ("Edit", "Book", "Series")
+    def _inspector_tab_titles() -> tuple[str, str, str, str]:
+        return ("Edit", "Diagnose", "Book", "Series")
 
     @staticmethod
     def _edit_section_titles() -> tuple[str, str, str]:
@@ -209,9 +216,11 @@ class EpubLayoutApp:
         content = ttk.Frame(inspector)
         content.pack(fill=tk.BOTH, expand=True)
         edit_tab = self._add_inspector_tab(content, "Edit")
+        diagnose_tab = self._add_inspector_tab(content, "Diagnose")
         book_tab = self._add_inspector_tab(content, "Book")
         series_tab = self._add_inspector_tab(content, "Series")
         self._build_edit_tab(edit_tab)
+        build_diagnosis_tab(self, diagnose_tab)
         self._build_book_tab(book_tab)
         self._build_series_tab(series_tab)
         self._show_inspector_tab("Edit")
@@ -308,30 +317,7 @@ class EpubLayoutApp:
         ttk.Button(parent, text=text, command=command).pack(fill=tk.X, pady=(6, 0))
 
     def _commands(self) -> tuple[AppCommand, ...]:
-        return (
-            AppCommand("Open PDF", "open_pdf", keywords=("import", "load")),
-            AppCommand("Import Series", "import_series", keywords=("folder", "volumes")),
-            AppCommand("Export EPUB", "export_epub", keywords=("save",)),
-            AppCommand("Mark Selected Volume Ready", "mark_selected_series_volume_ready", keywords=("series",)),
-            AppCommand("Unready Selected", "unready_selected", keywords=("series", "undo")),
-            AppCommand("Export Ready Series", "export_ready_series", keywords=("series",)),
-            AppCommand("Validate Series", "validate_series", keywords=("series", "check")),
-            AppCommand("Save Project", "save_project", keywords=("series", "project")),
-            AppCommand("Open Project", "open_project", keywords=("series", "project")),
-            AppCommand("Save Preset", "save_preset", keywords=("layout",)),
-            AppCommand("Load Preset", "load_preset", keywords=("layout",)),
-            AppCommand("Insert Blank Before", "insert_blank", (True,), ("page",)),
-            AppCommand("Insert Blank After", "insert_blank", (False,), ("page",)),
-            AppCommand("Insert Image Before", "insert_image", (True,), ("page",)),
-            AppCommand("Insert Image After", "insert_image", (False,), ("page",)),
-            AppCommand("Delete Selected Page", "delete_selected_entry", keywords=("remove",)),
-            AppCommand("Delete First...", "ask_delete_first", keywords=("bulk", "remove")),
-            AppCommand("Delete Last...", "ask_delete_last", keywords=("bulk", "remove")),
-            AppCommand("Delete Range...", "ask_delete_range", keywords=("bulk", "remove")),
-            AppCommand("Recover Last Deleted", "recover_last_deleted", keywords=("undo",)),
-            AppCommand("Set Selected As Cover", "set_selected_as_cover", keywords=("metadata",)),
-            AppCommand("Export Selected Images", "export_selected_images", keywords=("extract",)),
-        )
+        return app_commands()
 
     def _matching_commands(self, query: str) -> list[AppCommand]:
         words = [word.casefold() for word in query.split() if word.strip()]
@@ -802,6 +788,7 @@ class EpubLayoutApp:
 
     def _open_pdf_done(self, model: LayoutModel) -> None:
         self.model = model
+        reset_diagnosis_for_model(self, model)
         self.series_project = None
         self.active_series_volume = None
         self._sync_navigation_mode()

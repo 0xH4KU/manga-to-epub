@@ -25,7 +25,7 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
         self.assertEqual((1100, 680), app.root.minsize_value)
 
     def test_inspector_tabs_group_workbench_controls(self):
-        self.assertEqual(("Edit", "Book", "Series"), EpubLayoutApp._inspector_tab_titles())
+        self.assertEqual(("Edit", "Diagnose", "Book", "Series"), EpubLayoutApp._inspector_tab_titles())
 
     def test_edit_inspector_sections_follow_layout_workflow(self):
         self.assertEqual(("Insert", "Delete", "Repair"), EpubLayoutApp._edit_section_titles())

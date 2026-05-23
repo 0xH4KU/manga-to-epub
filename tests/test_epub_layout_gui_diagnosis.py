@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ from manga_pdf_to_epub.epub_layout_diagnosis import (
     classify_insert_points,
     diagnose_spread_damage,
 )
+from manga_pdf_to_epub.epub_layout_gui import EpubLayoutApp
 from manga_pdf_to_epub.epub_layout_diagnosis_gui import (
     DiagnosisPanel,
     DiagnosisPanelCallbacks,
@@ -113,6 +115,35 @@ class DiagnosisPanelTests(unittest.TestCase):
         button_by_text["Recheck Layout"].options["command"]()
 
         self.assertEqual(["scan", "recheck"], calls)
+
+
+class DiagnosisGuiIntegrationTests(unittest.TestCase):
+    def test_new_pdf_resets_diagnosis_state(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = None
+        app.series_project = "old"
+        app.active_series_volume = "old"
+        app._sync_navigation_mode = lambda: None
+        app._reset_deleted_history = lambda: None
+        app._reset_preview_cache = lambda: None
+        app._load_metadata_fields = lambda: None
+        app.refresh_list = lambda: None
+        app.refresh_workspace_status = lambda: None
+        app.refresh_preview = lambda: None
+        app.page_list = SimpleNamespace(selection_clear=lambda *_args: None, selection_set=lambda *_args: None)
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+        app.pdf_path = Path("/tmp/book.pdf")
+        app.diagnosis_session = None
+        app.spread_damage = ["old"]
+        app.insert_classification = "old"
+        app.diagnosis_stale = True
+
+        app._open_pdf_done(SimpleNamespace(entries=[page(1), page(2)], source_page_count=2))
+
+        self.assertEqual(2, app.diagnosis_session.source_page_count)
+        self.assertEqual([], app.spread_damage)
+        self.assertIsNone(app.insert_classification)
+        self.assertFalse(app.diagnosis_stale)
 
 
 if __name__ == "__main__":
