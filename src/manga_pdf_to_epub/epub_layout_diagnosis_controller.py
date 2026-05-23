@@ -355,7 +355,7 @@ class EpubLayoutDiagnosisMixin:
             return
         first_index, second_index = sorted(selection)
         entries = self.model.entries
-        if second_index >= len(entries):
+        if first_index < 0 or second_index >= len(entries) or second_index != first_index + 1:
             self._reject_selected_spread()
             return
         first = entries[first_index]
