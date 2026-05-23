@@ -219,5 +219,41 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         self.assertEqual("Added confirmed spread 173-174.", app.status_value)
 
 
+class DiagnosisDamageWorkflowTests(unittest.TestCase):
+    def test_damage_check_uses_confirmed_spreads_and_apple_preview_flag(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(index) for index in range(1, 41)])
+        app.apple_preview = SimpleNamespace(get=lambda: True)
+        app.diagnosis_session = DiagnosisSession(source_page_count=40)
+        app.diagnosis_session.add_manual_spread(37, 38)
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+        app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "list_preserved", preserve_yview)
+        app.spine_markers = {0: object()}
+        app.insert_classification = "old"
+        app.diagnosis_stale = True
+
+        app.check_confirmed_spread_damage()
+
+        self.assertEqual("damaged", app.spread_damage[0].status)
+        self.assertIsNone(app.insert_classification)
+        self.assertEqual({}, app.spine_markers)
+        self.assertFalse(app.diagnosis_stale)
+        self.assertEqual("Checked 1 confirmed spreads: 1 damaged, 0 missing.", app.status_value)
+        self.assertTrue(app.panel_refreshed)
+        self.assertTrue(app.list_preserved)
+
+    def test_damage_check_requires_confirmed_spreads(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2)])
+        app.apple_preview = SimpleNamespace(get=lambda: False)
+        app.diagnosis_session = DiagnosisSession(source_page_count=2)
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+
+        app.check_confirmed_spread_damage()
+
+        self.assertEqual("Mark at least one true spread before checking damage.", app.status_value)
+
+
 if __name__ == "__main__":
     unittest.main()

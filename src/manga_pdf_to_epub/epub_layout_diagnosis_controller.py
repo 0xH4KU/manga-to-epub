@@ -7,9 +7,15 @@ from tkinter import filedialog, messagebox, simpledialog
 from .epub_layout_diagnosis import (
     DiagnosisSession,
     SpreadCandidate,
+    diagnose_spread_damage,
     read_spread_candidates_csv,
 )
 from .epub_layout_diagnosis_gui import DiagnosisPanel, DiagnosisPanelCallbacks, diagnosis_summary_texts
+from .epub_layout_diagnosis_runner import (
+    default_diagnosis_output_dir,
+    resolve_spread_scan_command,
+    run_diagnosis_command,
+)
 
 
 class EpubLayoutDiagnosisMixin:
@@ -36,6 +42,47 @@ class EpubLayoutDiagnosisMixin:
         self.refresh_list(preserve_yview=True)
         self.refresh_diagnosis_panel()
         self.status.set(f"Loaded {len(candidates)} spread candidates for review.")
+
+    def run_spread_diagnosis(self) -> None:
+        if getattr(self, "model", None) is None or getattr(self, "pdf_path", None) is None:
+            return
+        project_root = Path(__file__).resolve().parents[2]
+        output_dir = default_diagnosis_output_dir(project_root, self.pdf_path, "spread")
+        command = resolve_spread_scan_command(project_root, self.pdf_path, output_dir)
+        if command is None:
+            messagebox.showerror(
+                "Spread scan unavailable",
+                "Could not find sibling manga-spread-continuity environment. Use Import Spread Candidates instead.",
+            )
+            return
+        self._run_background(
+            "Running cross-page scan. This can take a few minutes.",
+            lambda: run_diagnosis_command(command),
+            self._spread_scan_done,
+        )
+
+    def _spread_scan_done(self, result) -> None:
+        candidates = read_spread_candidates_csv(result.output_dir / "adjacent_clusters.csv")
+        self._load_spread_candidates(candidates)
+
+    def check_confirmed_spread_damage(self) -> None:
+        if getattr(self, "model", None) is None or getattr(self, "diagnosis_session", None) is None:
+            return
+        confirmed = self.diagnosis_session.confirmed_spreads()
+        if not confirmed:
+            self.status.set("Mark at least one true spread before checking damage.")
+            return
+        self.spread_damage = diagnose_spread_damage(self.model.entries, confirmed, self.apple_preview.get())
+        self.insert_classification = None
+        self.spine_markers = {}
+        self.diagnosis_stale = False
+        self.refresh_list(preserve_yview=True)
+        self.refresh_diagnosis_panel()
+        damaged_count = sum(1 for item in self.spread_damage if item.status == "damaged")
+        missing_count = sum(1 for item in self.spread_damage if item.status == "missing")
+        self.status.set(
+            f"Checked {len(confirmed)} confirmed spreads: {damaged_count} damaged, {missing_count} missing."
+        )
 
     def mark_selected_spread_true(self) -> None:
         self._mark_selected_spread("true", "true spread")
@@ -114,12 +161,12 @@ def build_diagnosis_tab(app, parent) -> None:
 
 def diagnosis_callbacks(app) -> DiagnosisPanelCallbacks:
     return DiagnosisPanelCallbacks(
-        run_spread_diagnosis=lambda: _stub_status(app, "Spread scan will be wired in a later task."),
+        run_spread_diagnosis=app.run_spread_diagnosis,
         import_spread_candidates=app.import_spread_candidates,
         mark_selected_spread_true=app.mark_selected_spread_true,
         mark_selected_spread_false=app.mark_selected_spread_false,
         add_missing_spread=app.add_missing_spread,
-        check_confirmed_spread_damage=lambda: _stub_status(app, "Damage checking will be wired in a later task."),
+        check_confirmed_spread_damage=app.check_confirmed_spread_damage,
         run_insert_point_scoring=lambda: _stub_status(app, "Insert-point scoring will be wired in a later task."),
         import_insert_scores=lambda: _stub_status(app, "Insert score import will be wired in a later task."),
         insert_selected_diagnosis_blank=lambda: _stub_status(app, "Blank insertion from diagnosis will be wired in a later task."),
