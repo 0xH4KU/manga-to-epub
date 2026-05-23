@@ -286,11 +286,38 @@ class DiagnosisSelectionSyncTests(unittest.TestCase):
         app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=None))
         app._syncing_spine_selection = True
         app.refresh_preview = lambda: setattr(app, "main_preview_refreshed", True)
+        app.refresh_diagnosis_preview = lambda: setattr(app, "diagnosis_preview_refreshed", True)
 
         app.sync_selection_from_main()
 
         self.assertEqual(None, app.diagnosis_window.spine_list.selection)
         self.assertFalse(hasattr(app, "main_preview_refreshed"))
+        self.assertFalse(hasattr(app, "diagnosis_preview_refreshed"))
+
+    def test_diagnosis_selection_sync_guard_prevents_recursion(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.page_list = FakeListbox(selection=None)
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=1))
+        app._syncing_spine_selection = True
+        app.refresh_preview = lambda: setattr(app, "main_preview_refreshed", True)
+        app.refresh_diagnosis_preview = lambda: setattr(app, "diagnosis_preview_refreshed", True)
+
+        app.sync_selection_from_diagnosis()
+
+        self.assertEqual(None, app.page_list.selection)
+        self.assertFalse(hasattr(app, "main_preview_refreshed"))
+        self.assertFalse(hasattr(app, "diagnosis_preview_refreshed"))
+
+    def test_sync_selection_from_main_noops_diagnosis_preview_before_task5(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.page_list = FakeListbox(selection=0)
+        app.diagnosis_window = None
+        app.refresh_preview = lambda: setattr(app, "main_preview_refreshed", True)
+        app._syncing_spine_selection = False
+
+        app.sync_selection_from_main()
+
+        self.assertTrue(app.main_preview_refreshed)
 
 
 class DiagnosisWindowLifecycleTests(unittest.TestCase):
