@@ -201,12 +201,35 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
         app._selected_spread_candidate_id = lambda: "037-038"
         app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.insert_classification = object()
+        app.spine_markers = {0: object()}
 
         app.mark_selected_spread_true()
 
         self.assertEqual([(37, 38)], [(item.start_page, item.end_page) for item in app.diagnosis_session.confirmed_spreads()])
         self.assertTrue(app.diagnosis_stale)
+        self.assertIsNone(app.insert_classification)
+        self.assertEqual({}, app.spine_markers)
         self.assertEqual("Marked 037-038 as true spread.", app.status_value)
+        self.assertTrue(app.panel_refreshed)
+
+    def test_mark_selected_candidate_false_clears_insert_suggestions(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.diagnosis_session = DiagnosisSession(source_page_count=200)
+        app.diagnosis_session.load_spread_candidates([SpreadCandidate("037-038", 37, 38, 0.91, 0.88, "review")])
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+        app._selected_spread_candidate_id = lambda: "037-038"
+        app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.insert_classification = object()
+        app.spine_markers = {0: object()}
+
+        app.mark_selected_spread_false()
+
+        self.assertEqual([], app.diagnosis_session.confirmed_spreads())
+        self.assertTrue(app.diagnosis_stale)
+        self.assertIsNone(app.insert_classification)
+        self.assertEqual({}, app.spine_markers)
+        self.assertEqual("Marked 037-038 as false positive.", app.status_value)
         self.assertTrue(app.panel_refreshed)
 
     def test_manual_missing_spread_is_confirmed(self):
@@ -214,12 +237,32 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         app.diagnosis_session = DiagnosisSession(source_page_count=200)
         app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
         app.refresh_diagnosis_panel = lambda: None
+        app.insert_classification = object()
+        app.spine_markers = {0: object()}
 
         app._add_missing_spread_pair(173, 174)
 
         self.assertEqual([(173, 174)], [(item.start_page, item.end_page) for item in app.diagnosis_session.confirmed_spreads()])
         self.assertTrue(app.diagnosis_stale)
+        self.assertIsNone(app.insert_classification)
+        self.assertEqual({}, app.spine_markers)
         self.assertEqual("Added confirmed spread 173-174.", app.status_value)
+
+    def test_preview_layout_option_change_marks_diagnosis_stale(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.diagnosis_stale = False
+        app.insert_classification = object()
+        app.spine_markers = {0: object()}
+        app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        app.refresh_preview_after_diagnosis_layout_option_change()
+
+        self.assertTrue(app.diagnosis_stale)
+        self.assertIsNone(app.insert_classification)
+        self.assertEqual({}, app.spine_markers)
+        self.assertTrue(app.panel_refreshed)
+        self.assertTrue(app.preview_refreshed)
 
 
 class DiagnosisDamageWorkflowTests(unittest.TestCase):

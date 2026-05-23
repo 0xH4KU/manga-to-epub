@@ -125,6 +125,8 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
         labels = [widget.options.get("text") for widget in widgets]
         self.assertIn("Preview Apple Books cover gap", labels)
         self.assertNotIn("Apple Books-like cover-right gap", labels)
+        preview_toggle = next(widget for widget in widgets if widget.options.get("text") == "Preview Apple Books cover gap")
+        self.assertEqual(app.refresh_preview_after_diagnosis_layout_option_change, preview_toggle.options.get("command"))
 
     def test_series_tab_omits_old_batch_template_workflow(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

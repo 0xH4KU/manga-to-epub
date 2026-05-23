@@ -223,15 +223,17 @@ class EpubLayoutDiagnosisMixin:
             self.status.set("Select a spread candidate first.")
             return
         self.diagnosis_session.mark_candidate(pair_id, status)
-        self.diagnosis_stale = True
-        self.refresh_diagnosis_panel()
+        self._mark_diagnosis_stale()
         self.status.set(f"Marked {pair_id} as {status_label}.")
 
     def _add_missing_spread_pair(self, start_page: int, end_page: int) -> None:
         candidate = self.diagnosis_session.add_manual_spread(start_page, end_page)
-        self.diagnosis_stale = True
-        self.refresh_diagnosis_panel()
+        self._mark_diagnosis_stale()
         self.status.set(f"Added confirmed spread {candidate.pair_id}.")
+
+    def refresh_preview_after_diagnosis_layout_option_change(self) -> None:
+        self._mark_diagnosis_stale()
+        self.refresh_preview()
 
     def import_spread_candidates(self) -> None:
         path = filedialog.askopenfilename(

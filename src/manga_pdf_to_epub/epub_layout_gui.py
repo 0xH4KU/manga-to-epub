@@ -204,7 +204,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
             preview_header,
             text="Preview Apple Books cover gap",
             variable=self.apple_preview,
-            command=self.refresh_preview,
+            command=self.refresh_preview_after_diagnosis_layout_option_change,
         ).pack(side=tk.RIGHT)
         self.preview = tk.Canvas(center, background="#202020", highlightthickness=0)
         self.preview.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
@@ -1146,8 +1146,6 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
             self._mark_active_volume_edited()
 
     def _mark_diagnosis_stale(self) -> None:
-        if not hasattr(self, "diagnosis_stale"):
-            return
         self.diagnosis_stale = True
         self.insert_classification = None
         self.spine_markers = {}
