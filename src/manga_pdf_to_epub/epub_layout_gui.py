@@ -1145,12 +1145,6 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
         if mark_edited:
             self._mark_active_volume_edited()
 
-    def _mark_diagnosis_stale(self) -> None:
-        self.diagnosis_stale = True
-        self.insert_classification = None
-        self.spine_markers = {}
-        self.refresh_diagnosis_panel()
-
     def _mark_active_volume_edited(self) -> None:
         volume = getattr(self, "active_series_volume", None)
         if getattr(self, "series_project", None) is None or volume is None:

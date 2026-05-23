@@ -132,6 +132,23 @@ class EpubLayoutDiagnosisMixin:
         except tk.TclError:
             pass
 
+    def _mark_diagnosis_stale(self, refresh_spine: bool = False) -> None:
+        self.diagnosis_stale = True
+        self.insert_classification = None
+        self.spine_markers = {}
+        if refresh_spine:
+            self._refresh_spine_preserving_selection()
+        self.refresh_diagnosis_panel()
+
+    def _refresh_spine_preserving_selection(self) -> None:
+        if not hasattr(self, "page_list"):
+            self.refresh_list(preserve_yview=True)
+            return
+        selected = self.selected_index()
+        self.refresh_list(preserve_yview=True)
+        if selected is not None and getattr(self, "model", None) is not None and self.model.entries:
+            self.page_list.selection_set(min(selected, len(self.model.entries) - 1))
+
     def import_insert_scores(self) -> None:
         path = filedialog.askopenfilename(
             title="Import insert scores",
@@ -223,16 +240,16 @@ class EpubLayoutDiagnosisMixin:
             self.status.set("Select a spread candidate first.")
             return
         self.diagnosis_session.mark_candidate(pair_id, status)
-        self._mark_diagnosis_stale()
+        self._mark_diagnosis_stale(refresh_spine=True)
         self.status.set(f"Marked {pair_id} as {status_label}.")
 
     def _add_missing_spread_pair(self, start_page: int, end_page: int) -> None:
         candidate = self.diagnosis_session.add_manual_spread(start_page, end_page)
-        self._mark_diagnosis_stale()
+        self._mark_diagnosis_stale(refresh_spine=True)
         self.status.set(f"Added confirmed spread {candidate.pair_id}.")
 
     def refresh_preview_after_diagnosis_layout_option_change(self) -> None:
-        self._mark_diagnosis_stale()
+        self._mark_diagnosis_stale(refresh_spine=True)
         self.refresh_preview()
 
     def import_spread_candidates(self) -> None:

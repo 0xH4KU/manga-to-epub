@@ -201,6 +201,7 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
         app._selected_spread_candidate_id = lambda: "037-038"
         app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "list_preserved", preserve_yview)
         app.insert_classification = object()
         app.spine_markers = {0: object()}
 
@@ -212,6 +213,7 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         self.assertEqual({}, app.spine_markers)
         self.assertEqual("Marked 037-038 as true spread.", app.status_value)
         self.assertTrue(app.panel_refreshed)
+        self.assertTrue(app.list_preserved)
 
     def test_mark_selected_candidate_false_clears_insert_suggestions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
@@ -220,6 +222,7 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
         app._selected_spread_candidate_id = lambda: "037-038"
         app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "list_preserved", preserve_yview)
         app.insert_classification = object()
         app.spine_markers = {0: object()}
 
@@ -231,12 +234,14 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         self.assertEqual({}, app.spine_markers)
         self.assertEqual("Marked 037-038 as false positive.", app.status_value)
         self.assertTrue(app.panel_refreshed)
+        self.assertTrue(app.list_preserved)
 
     def test_manual_missing_spread_is_confirmed(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.diagnosis_session = DiagnosisSession(source_page_count=200)
         app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
         app.refresh_diagnosis_panel = lambda: None
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "list_preserved", preserve_yview)
         app.insert_classification = object()
         app.spine_markers = {0: object()}
 
@@ -247,6 +252,7 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         self.assertIsNone(app.insert_classification)
         self.assertEqual({}, app.spine_markers)
         self.assertEqual("Added confirmed spread 173-174.", app.status_value)
+        self.assertTrue(app.list_preserved)
 
     def test_preview_layout_option_change_marks_diagnosis_stale(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
@@ -254,6 +260,7 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         app.insert_classification = object()
         app.spine_markers = {0: object()}
         app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "list_preserved", preserve_yview)
         app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
 
         app.refresh_preview_after_diagnosis_layout_option_change()
@@ -262,7 +269,30 @@ class DiagnosisReviewWorkflowTests(unittest.TestCase):
         self.assertIsNone(app.insert_classification)
         self.assertEqual({}, app.spine_markers)
         self.assertTrue(app.panel_refreshed)
+        self.assertTrue(app.list_preserved)
         self.assertTrue(app.preview_refreshed)
+
+    def test_preview_layout_option_change_preserves_spine_selection(self):
+        class SelectionClearingListbox(FakeListbox):
+            def delete(self, *args):
+                super().delete(*args)
+                self.selection = None
+
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(index) for index in range(1, 8)])
+        app.page_list = SelectionClearingListbox(selection=4, yview=(0.5, 0.8))
+        app.diagnosis_stale = False
+        app.insert_classification = object()
+        app.spine_markers = {0: object()}
+        app.refresh_workspace_status = lambda: None
+        app.refresh_diagnosis_panel = lambda: None
+        app.refresh_preview = lambda: setattr(app, "preview_selection", app.selected_index())
+        app._is_cover_entry = lambda _entry: False
+
+        app.refresh_preview_after_diagnosis_layout_option_change()
+
+        self.assertEqual(4, app.page_list.selection)
+        self.assertEqual(4, app.preview_selection)
 
 
 class DiagnosisDamageWorkflowTests(unittest.TestCase):
