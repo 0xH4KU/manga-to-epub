@@ -42,16 +42,16 @@ def diagnosis_summary_texts(
 
 @dataclass(frozen=True)
 class DiagnosisPanelCallbacks:
-    run_spread_scan: Callable[[], None]
+    run_spread_diagnosis: Callable[[], None]
     import_spread_candidates: Callable[[], None]
-    mark_true: Callable[[], None]
-    mark_false: Callable[[], None]
+    mark_selected_spread_true: Callable[[], None]
+    mark_selected_spread_false: Callable[[], None]
     add_missing_spread: Callable[[], None]
-    check_damage: Callable[[], None]
-    run_insert_scores: Callable[[], None]
+    check_confirmed_spread_damage: Callable[[], None]
+    run_insert_point_scoring: Callable[[], None]
     import_insert_scores: Callable[[], None]
-    insert_selected: Callable[[], None]
-    recheck_layout: Callable[[], None]
+    insert_selected_diagnosis_blank: Callable[[], None]
+    recheck_diagnosis_layout: Callable[[], None]
 
 
 class DiagnosisPanel:
@@ -69,14 +69,14 @@ class DiagnosisPanel:
     def _build(self, parent: ttk.Frame) -> None:
         ttk.Label(parent, text="Spread Candidates").pack(anchor=tk.W)
         ttk.Label(parent, textvariable=self.summary_var).pack(anchor=tk.W, pady=(4, 0))
-        ttk.Button(parent, text="Run Cross-Page Scan", command=self.callbacks.run_spread_scan).pack(fill=tk.X, pady=(6, 0))
+        ttk.Button(parent, text="Run Cross-Page Scan", command=self.callbacks.run_spread_diagnosis).pack(fill=tk.X, pady=(6, 0))
         ttk.Button(parent, text="Import Spread Candidates...", command=self.callbacks.import_spread_candidates).pack(
             fill=tk.X,
             pady=(6, 0),
         )
         self.candidate_list.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
-        ttk.Button(parent, text="Mark Selected True", command=self.callbacks.mark_true).pack(fill=tk.X, pady=(6, 0))
-        ttk.Button(parent, text="Mark Selected False", command=self.callbacks.mark_false).pack(fill=tk.X, pady=(6, 0))
+        ttk.Button(parent, text="Mark Selected True", command=self.callbacks.mark_selected_spread_true).pack(fill=tk.X, pady=(6, 0))
+        ttk.Button(parent, text="Mark Selected False", command=self.callbacks.mark_selected_spread_false).pack(fill=tk.X, pady=(6, 0))
         ttk.Button(parent, text="Add Missing Spread...", command=self.callbacks.add_missing_spread).pack(
             fill=tk.X,
             pady=(6, 0),
@@ -84,7 +84,7 @@ class DiagnosisPanel:
         ttk.Separator(parent).pack(fill=tk.X, pady=14)
         ttk.Label(parent, text="Damage Check").pack(anchor=tk.W)
         ttk.Label(parent, textvariable=self.damage_var).pack(anchor=tk.W, pady=(4, 0))
-        ttk.Button(parent, text="Check Damage Against Current Layout", command=self.callbacks.check_damage).pack(
+        ttk.Button(parent, text="Check Damage Against Current Layout", command=self.callbacks.check_confirmed_spread_damage).pack(
             fill=tk.X,
             pady=(6, 0),
         )
@@ -93,7 +93,7 @@ class DiagnosisPanel:
         ttk.Label(parent, text="Insert Points").pack(anchor=tk.W)
         ttk.Label(parent, textvariable=self.insert_var).pack(anchor=tk.W, pady=(4, 0))
         ttk.Label(parent, textvariable=self.stale_var).pack(anchor=tk.W, pady=(4, 0))
-        ttk.Button(parent, text="Run Insert-Point Scoring", command=self.callbacks.run_insert_scores).pack(
+        ttk.Button(parent, text="Run Insert-Point Scoring", command=self.callbacks.run_insert_point_scoring).pack(
             fill=tk.X,
             pady=(6, 0),
         )
@@ -102,8 +102,8 @@ class DiagnosisPanel:
             pady=(6, 0),
         )
         self.insert_list.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
-        ttk.Button(parent, text="Insert Selected Blank", command=self.callbacks.insert_selected).pack(
+        ttk.Button(parent, text="Insert Selected Blank", command=self.callbacks.insert_selected_diagnosis_blank).pack(
             fill=tk.X,
             pady=(6, 0),
         )
-        ttk.Button(parent, text="Recheck Layout", command=self.callbacks.recheck_layout).pack(fill=tk.X, pady=(6, 0))
+        ttk.Button(parent, text="Recheck Layout", command=self.callbacks.recheck_diagnosis_layout).pack(fill=tk.X, pady=(6, 0))

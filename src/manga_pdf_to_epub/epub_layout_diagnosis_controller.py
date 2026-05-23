@@ -36,16 +36,16 @@ def build_diagnosis_tab(app, parent) -> None:
 
 def diagnosis_callbacks(app) -> DiagnosisPanelCallbacks:
     return DiagnosisPanelCallbacks(
-        run_spread_scan=lambda: _stub_status(app, "Spread scan will be wired in a later task."),
+        run_spread_diagnosis=lambda: _stub_status(app, "Spread scan will be wired in a later task."),
         import_spread_candidates=lambda: _stub_status(app, "Spread candidate import will be wired in a later task."),
-        mark_true=lambda: _stub_status(app, "Spread review marking will be wired in a later task."),
-        mark_false=lambda: _stub_status(app, "Spread review marking will be wired in a later task."),
+        mark_selected_spread_true=lambda: _stub_status(app, "Spread review marking will be wired in a later task."),
+        mark_selected_spread_false=lambda: _stub_status(app, "Spread review marking will be wired in a later task."),
         add_missing_spread=lambda: _stub_status(app, "Manual spread entry will be wired in a later task."),
-        check_damage=lambda: _stub_status(app, "Damage checking will be wired in a later task."),
-        run_insert_scores=lambda: _stub_status(app, "Insert-point scoring will be wired in a later task."),
+        check_confirmed_spread_damage=lambda: _stub_status(app, "Damage checking will be wired in a later task."),
+        run_insert_point_scoring=lambda: _stub_status(app, "Insert-point scoring will be wired in a later task."),
         import_insert_scores=lambda: _stub_status(app, "Insert score import will be wired in a later task."),
-        insert_selected=lambda: _stub_status(app, "Blank insertion from diagnosis will be wired in a later task."),
-        recheck_layout=lambda: _stub_status(app, "Layout recheck will be wired in a later task."),
+        insert_selected_diagnosis_blank=lambda: _stub_status(app, "Blank insertion from diagnosis will be wired in a later task."),
+        recheck_diagnosis_layout=lambda: _stub_status(app, "Layout recheck will be wired in a later task."),
     )
 
 

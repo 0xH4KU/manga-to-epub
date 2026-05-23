@@ -55,6 +55,23 @@ class DiagnosisGuiTextTests(unittest.TestCase):
 
 
 class DiagnosisPanelTests(unittest.TestCase):
+    def test_callback_contract_uses_future_action_names(self):
+        self.assertEqual(
+            [
+                "run_spread_diagnosis",
+                "import_spread_candidates",
+                "mark_selected_spread_true",
+                "mark_selected_spread_false",
+                "add_missing_spread",
+                "check_confirmed_spread_damage",
+                "run_insert_point_scoring",
+                "import_insert_scores",
+                "insert_selected_diagnosis_blank",
+                "recheck_diagnosis_layout",
+            ],
+            list(DiagnosisPanelCallbacks.__dataclass_fields__),
+        )
+
     def test_panel_binds_string_vars_to_parent_and_buttons_to_callbacks(self):
         calls = []
         parent = object()
@@ -65,16 +82,16 @@ class DiagnosisPanelTests(unittest.TestCase):
             return lambda: calls.append(name)
 
         callbacks = DiagnosisPanelCallbacks(
-            callback("scan"),
-            callback("import_spreads"),
-            callback("true"),
-            callback("false"),
-            callback("manual"),
-            callback("damage"),
-            callback("score"),
-            callback("import_scores"),
-            callback("insert"),
-            callback("recheck"),
+            run_spread_diagnosis=callback("scan"),
+            import_spread_candidates=callback("import_spreads"),
+            mark_selected_spread_true=callback("true"),
+            mark_selected_spread_false=callback("false"),
+            add_missing_spread=callback("manual"),
+            check_confirmed_spread_damage=callback("damage"),
+            run_insert_point_scoring=callback("score"),
+            import_insert_scores=callback("import_scores"),
+            insert_selected_diagnosis_blank=callback("insert"),
+            recheck_diagnosis_layout=callback("recheck"),
         )
 
         class FakeStringVar:
