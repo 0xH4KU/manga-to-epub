@@ -252,19 +252,29 @@ class DiagnosisSpineViewTests(unittest.TestCase):
 class DiagnosisPreviewTests(unittest.TestCase):
     def test_refresh_diagnosis_preview_draws_selected_spread(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
+        diagnosis_canvas = FakeCanvas()
+        diagnosis_refs = ["old"]
+        app.photo_refs = ["main"]
         app.model = SimpleNamespace(entries=[page(1), page(2), page(3)])
         app.apple_preview = SimpleNamespace(get=lambda: False)
         app.diagnosis_window = SimpleNamespace(
             spine_list=FakeListbox(selection=1),
-            preview=FakeCanvas(),
-            photo_refs=[],
+            preview=diagnosis_canvas,
+            photo_refs=diagnosis_refs,
         )
         app.draws = []
-        app._draw_entry_on_canvas = lambda canvas, photo_refs, entry, x, y, width, height: app.draws.append(entry.label)
+
+        def draw(canvas, photo_refs, entry, *_args):
+            app.draws.append((canvas, photo_refs, entry.label))
+            photo_refs.append(entry.label)
+
+        app._draw_entry_on_canvas = draw
 
         app.refresh_diagnosis_preview()
 
-        self.assertEqual(["Page 1", "Page 2"], app.draws)
+        self.assertEqual([(diagnosis_canvas, diagnosis_refs, "Page 1"), (diagnosis_canvas, diagnosis_refs, "Page 2")], app.draws)
+        self.assertEqual(["Page 1", "Page 2"], diagnosis_refs)
+        self.assertEqual(["main"], app.photo_refs)
 
     def test_refresh_diagnosis_preview_noops_when_window_closed(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
@@ -334,7 +344,7 @@ class DiagnosisSelectionSyncTests(unittest.TestCase):
         self.assertFalse(hasattr(app, "main_preview_refreshed"))
         self.assertFalse(hasattr(app, "diagnosis_preview_refreshed"))
 
-    def test_sync_selection_from_main_noops_diagnosis_preview_before_task5(self):
+    def test_sync_selection_from_main_works_without_diagnosis_window(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.page_list = FakeListbox(selection=0)
         app.diagnosis_window = None
