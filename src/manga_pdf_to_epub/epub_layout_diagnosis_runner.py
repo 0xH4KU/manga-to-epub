@@ -57,8 +57,7 @@ def resolve_insert_score_command(project_root: Path, pdf_path: Path, output_dir:
     return DiagnosisCommand(
         (
             str(python_path),
-            "-m",
-            "manga_insert_point_scorer.cli",
+            str(package_cli),
             str(pdf_path),
             "--output",
             str(output_dir),

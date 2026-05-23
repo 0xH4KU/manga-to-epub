@@ -63,8 +63,10 @@ class DiagnosisRunnerTests(unittest.TestCase):
 
         self.assertIsInstance(command, DiagnosisCommand)
         self.assertEqual(insert_root, command.cwd)
-        self.assertEqual("-m", command.argv[1])
-        self.assertIn("manga_insert_point_scorer.cli", command.argv)
+        self.assertEqual(str(package_dir / "cli.py"), command.argv[1])
+        self.assertIn(str(Path("/books/book.pdf")), command.argv)
+        self.assertIn("--output", command.argv)
+        self.assertIn(str(output_dir), command.argv)
 
 
 if __name__ == "__main__":
