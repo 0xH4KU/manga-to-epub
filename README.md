@@ -36,6 +36,9 @@ This tool focuses on the boring-but-crucial details:
 - Page deletion with recover support.
 - Preset save/load for applying layout corrections to one volume or a scoped set of series volumes.
 - Series import with generated `Vol.xx` titles, multi-volume ready marking, selected-volume unready, and ready-only export.
+- Diagnose possible split double-page spreads from a single-volume GUI workflow.
+- Manually confirm true spreads, add missed spread pairs, and check whether the current Apple Books preview layout damages them.
+- Review color-marked blank insertion suggestions before executing one insertion at a time.
 
 ## Install
 
@@ -76,6 +79,23 @@ Typical single-volume Apple Books manga workflow:
 10. Export EPUB and import it into Apple Books for final checking.
 
 The GUI normalizes EPUB internals during export. For example, if source pages 1-3 are deleted and the visible list starts with source `Page 4`, the exported EPUB still uses sequential names such as `page-0001.xhtml` and `images/page-0001.jpg`. The visible source labels remain unchanged so you can trace edits back to the original PDF.
+
+## Diagnosis Workflow
+
+The `Diagnose` tab is a human-in-the-loop repair workflow. It can run or import
+cross-page spread candidates, but it does not trust them automatically. Mark each
+true spread manually, mark false positives as false when useful, and add any
+missed adjacent spread pair before checking damage.
+
+Damage checking uses the same Apple Books cover-gap preview flag as the main
+spread preview. When the flag is enabled, the virtual blank page beside the cover
+is included in the pairing check because it can shift later spreads.
+
+Insert-point scoring is a second manual step. Green spine markers show suggested
+one-blank insertions that repair at least one damaged confirmed spread without
+breaking currently intact confirmed spreads. Red markers show protected gaps.
+The tool inserts only the selected suggestion, then marks diagnosis results stale
+until you click `Recheck Layout`.
 
 ## Series Project Workflow
 
