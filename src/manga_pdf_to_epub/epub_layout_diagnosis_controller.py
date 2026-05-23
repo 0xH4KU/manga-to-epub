@@ -57,7 +57,7 @@ class EpubLayoutDiagnosisMixin:
             return
         self._run_background(
             "Running cross-page scan. This can take a few minutes.",
-            lambda: _run_spread_scan_work(command),
+            lambda: _run_spread_scan_work(command, self.diagnosis_session.source_page_count),
             self._spread_scan_done,
             on_failure=self._spread_scan_failed,
         )
@@ -237,6 +237,8 @@ def _stub_status(app, message: str) -> None:
     app.status.set(message)
 
 
-def _run_spread_scan_work(command) -> list[SpreadCandidate]:
+def _run_spread_scan_work(command, source_page_count: int = 0) -> list[SpreadCandidate]:
     result = run_diagnosis_command(command)
-    return read_spread_candidates_csv(result.output_dir / "adjacent_clusters.csv")
+    candidates = read_spread_candidates_csv(result.output_dir / "adjacent_clusters.csv")
+    DiagnosisSession(source_page_count).load_spread_candidates(candidates)
+    return candidates

@@ -270,9 +270,24 @@ class DiagnosisSpreadScanWorkflowTests(unittest.TestCase):
                 "manga_pdf_to_epub.epub_layout_diagnosis_controller.run_diagnosis_command",
                 return_value=SimpleNamespace(output_dir=output_dir),
             ):
-                candidates = _run_spread_scan_work(SimpleNamespace())
+                candidates = _run_spread_scan_work(SimpleNamespace(), source_page_count=50)
 
         self.assertEqual(["037-038"], [candidate.pair_id for candidate in candidates])
+
+    def test_spread_scan_work_validates_candidates_in_background_phase(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            (output_dir / "adjacent_clusters.csv").write_text(
+                "start_page,end_page,decision,spread,review_score\n37,39,review,0.91,0.88\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "manga_pdf_to_epub.epub_layout_diagnosis_controller.run_diagnosis_command",
+                return_value=SimpleNamespace(output_dir=output_dir),
+            ):
+                with self.assertRaisesRegex(ValueError, "adjacent"):
+                    _run_spread_scan_work(SimpleNamespace(), source_page_count=50)
 
     def test_spread_scan_done_loads_parsed_candidates(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
