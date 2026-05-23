@@ -190,7 +190,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
         ttk.Label(self.spine_pane, text="Spine order").pack(anchor=tk.W)
         self.page_list = tk.Listbox(self.spine_pane, exportselection=False, activestyle="dotbox", selectmode=tk.EXTENDED)
         self.page_list.pack(fill=tk.BOTH, expand=True, pady=(6, 12))
-        self.page_list.bind("<<ListboxSelect>>", lambda _event: self.refresh_preview())
+        self.page_list.bind("<<ListboxSelect>>", lambda _event: self.sync_selection_from_main())
         self.page_list.bind("<ButtonPress-1>", self._page_drag_start)
         self.page_list.bind("<ButtonRelease-1>", self._page_drag_release)
         self._sync_navigation_mode()

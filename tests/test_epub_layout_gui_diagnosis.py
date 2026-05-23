@@ -249,6 +249,50 @@ class DiagnosisSpineViewTests(unittest.TestCase):
         self.assertIsNone(app.diagnosis_window)
 
 
+class DiagnosisSelectionSyncTests(unittest.TestCase):
+    def test_main_selection_updates_diagnose_selection_and_preview(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2), page(3)])
+        app.page_list = FakeListbox(selection=2)
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=None))
+        app.refresh_preview = lambda: setattr(app, "main_preview_refreshed", True)
+        app.refresh_diagnosis_preview = lambda: setattr(app, "diagnosis_preview_refreshed", True)
+        app._syncing_spine_selection = False
+
+        app.sync_selection_from_main()
+
+        self.assertEqual(2, app.diagnosis_window.spine_list.selection)
+        self.assertTrue(app.main_preview_refreshed)
+        self.assertTrue(app.diagnosis_preview_refreshed)
+
+    def test_diagnose_selection_updates_main_selection_and_preview(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2), page(3)])
+        app.page_list = FakeListbox(selection=None)
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=1))
+        app.refresh_preview = lambda: setattr(app, "main_preview_refreshed", app.selected_index())
+        app.refresh_diagnosis_preview = lambda: setattr(app, "diagnosis_preview_refreshed", True)
+        app._syncing_spine_selection = False
+
+        app.sync_selection_from_diagnosis()
+
+        self.assertEqual(1, app.page_list.selection)
+        self.assertEqual(1, app.main_preview_refreshed)
+        self.assertTrue(app.diagnosis_preview_refreshed)
+
+    def test_selection_sync_guard_prevents_recursion(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.page_list = FakeListbox(selection=1)
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=None))
+        app._syncing_spine_selection = True
+        app.refresh_preview = lambda: setattr(app, "main_preview_refreshed", True)
+
+        app.sync_selection_from_main()
+
+        self.assertEqual(None, app.diagnosis_window.spine_list.selection)
+        self.assertFalse(hasattr(app, "main_preview_refreshed"))
+
+
 class DiagnosisWindowLifecycleTests(unittest.TestCase):
     def _panel(self, candidate_selection=None):
         class Var:

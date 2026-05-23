@@ -59,6 +59,46 @@ class EpubLayoutDiagnosisMixin:
         self.refresh_diagnosis_spine()
         self.refresh_diagnosis_panel()
 
+    def sync_selection_from_main(self) -> None:
+        if getattr(self, "_syncing_spine_selection", False):
+            return
+        self._syncing_spine_selection = True
+        try:
+            selected = self.selected_index()
+            self._set_diagnosis_selection(selected)
+        finally:
+            self._syncing_spine_selection = False
+        self.refresh_preview()
+        self.refresh_diagnosis_preview()
+
+    def sync_selection_from_diagnosis(self) -> None:
+        if getattr(self, "_syncing_spine_selection", False):
+            return
+        window = getattr(self, "diagnosis_window", None)
+        if window is None:
+            return
+        selected = _first_selection(window.spine_list)
+        self._syncing_spine_selection = True
+        try:
+            self._set_main_selection(selected)
+        finally:
+            self._syncing_spine_selection = False
+        self.refresh_preview()
+        self.refresh_diagnosis_preview()
+
+    def _set_main_selection(self, selected: int | None) -> None:
+        self.page_list.selection_clear(0, tk.END)
+        if selected is not None:
+            self.page_list.selection_set(selected)
+
+    def _set_diagnosis_selection(self, selected: int | None) -> None:
+        window = getattr(self, "diagnosis_window", None)
+        if window is None:
+            return
+        window.spine_list.selection_clear(0, tk.END)
+        if selected is not None:
+            window.spine_list.selection_set(selected)
+
     def _diagnose_window_closed(self, closed_window=None) -> None:
         window = closed_window if closed_window is not None else getattr(self, "diagnosis_window", None)
         if closed_window is None or closed_window is getattr(self, "diagnosis_window", None):
@@ -335,6 +375,7 @@ def initialize_diagnosis_state(app, source_page_count: int = 0) -> None:
     app.diagnosis_panel = None
     app.diagnosis_window = None
     app.spine_markers = {}
+    app._syncing_spine_selection = False
 
 
 def reset_diagnosis_for_model(app, model) -> None:
