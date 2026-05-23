@@ -46,7 +46,7 @@ class DiagnosisPanelCallbacks:
     import_spread_candidates: Callable[[], None]
     mark_selected_spread_true: Callable[[], None]
     mark_selected_spread_false: Callable[[], None]
-    add_missing_spread: Callable[[], None]
+    add_selected_spread: Callable[[], None]
     check_confirmed_spread_damage: Callable[[], None]
     run_insert_point_scoring: Callable[[], None]
     import_insert_scores: Callable[[], None]
@@ -77,7 +77,7 @@ class DiagnosisPanel:
         self.candidate_list.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
         ttk.Button(parent, text="Mark Selected True", command=self.callbacks.mark_selected_spread_true).pack(fill=tk.X, pady=(6, 0))
         ttk.Button(parent, text="Mark Selected False", command=self.callbacks.mark_selected_spread_false).pack(fill=tk.X, pady=(6, 0))
-        ttk.Button(parent, text="Add Missing Spread...", command=self.callbacks.add_missing_spread).pack(
+        ttk.Button(parent, text="Add Selected As Spread", command=self.callbacks.add_selected_spread).pack(
             fill=tk.X,
             pady=(6, 0),
         )

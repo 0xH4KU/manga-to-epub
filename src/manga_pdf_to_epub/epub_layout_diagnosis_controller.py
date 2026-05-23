@@ -344,6 +344,32 @@ class EpubLayoutDiagnosisMixin:
         self._mark_diagnosis_stale(refresh_spine=True)
         self.status.set(f"Added confirmed spread {candidate.pair_id}.")
 
+    def add_selected_spread_from_diagnosis_spine(self) -> None:
+        window = getattr(self, "diagnosis_window", None)
+        if window is None or getattr(self, "model", None) is None:
+            return
+        selection = list(window.spine_list.curselection())
+        if len(selection) != 2:
+            self.status.set("Select exactly two adjacent real pages.")
+            return
+        first_index, second_index = sorted(selection)
+        entries = self.model.entries
+        if second_index >= len(entries):
+            self.status.set("Select exactly two adjacent real pages.")
+            return
+        first = entries[first_index]
+        second = entries[second_index]
+        first_source = getattr(first, "source_index", None)
+        second_source = getattr(second, "source_index", None)
+        if getattr(first, "is_blank", False) or getattr(second, "is_blank", False):
+            self.status.set("Select exactly two adjacent real pages.")
+            return
+        if first_source is None or second_source is None or second_source != first_source + 1:
+            self.status.set("Select exactly two adjacent real pages.")
+            return
+        self._add_missing_spread_pair(first_source, second_source)
+        self.refresh_diagnosis_spine(preserve_yview=True)
+
     def refresh_preview_after_diagnosis_layout_option_change(self) -> None:
         self._mark_diagnosis_stale(refresh_spine=True)
         self.refresh_preview()
@@ -415,7 +441,7 @@ def diagnosis_callbacks(app) -> DiagnosisPanelCallbacks:
         import_spread_candidates=app.import_spread_candidates,
         mark_selected_spread_true=app.mark_selected_spread_true,
         mark_selected_spread_false=app.mark_selected_spread_false,
-        add_missing_spread=app.add_missing_spread,
+        add_selected_spread=app.add_selected_spread_from_diagnosis_spine,
         check_confirmed_spread_damage=app.check_confirmed_spread_damage,
         run_insert_point_scoring=app.run_insert_point_scoring,
         import_insert_scores=app.import_insert_scores,

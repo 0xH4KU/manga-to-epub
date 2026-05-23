@@ -70,7 +70,7 @@ class DiagnosisPanelTests(unittest.TestCase):
                 "import_spread_candidates",
                 "mark_selected_spread_true",
                 "mark_selected_spread_false",
-                "add_missing_spread",
+                "add_selected_spread",
                 "check_confirmed_spread_damage",
                 "run_insert_point_scoring",
                 "import_insert_scores",
@@ -94,7 +94,7 @@ class DiagnosisPanelTests(unittest.TestCase):
             import_spread_candidates=callback("import_spreads"),
             mark_selected_spread_true=callback("true"),
             mark_selected_spread_false=callback("false"),
-            add_missing_spread=callback("manual"),
+            add_selected_spread=callback("manual"),
             check_confirmed_spread_damage=callback("damage"),
             run_insert_point_scoring=callback("score"),
             import_insert_scores=callback("import_scores"),
@@ -138,8 +138,71 @@ class DiagnosisPanelTests(unittest.TestCase):
 
         button_by_text["Run Cross-Page Scan"].options["command"]()
         button_by_text["Recheck Layout"].options["command"]()
+        button_by_text["Add Selected As Spread"].options["command"]()
 
-        self.assertEqual(["scan", "recheck"], calls)
+        self.assertEqual(["scan", "recheck", "manual"], calls)
+
+
+class DiagnosisManualSpreadSelectionTests(unittest.TestCase):
+    def test_add_selected_spread_uses_two_selected_real_adjacent_pages(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2), page(3)])
+        app.diagnosis_session = DiagnosisSession(source_page_count=3)
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=(0, 1)))
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+        app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "main_list_refreshed", preserve_yview)
+        app.refresh_diagnosis_spine = lambda preserve_yview=False: setattr(app, "diagnose_list_refreshed", preserve_yview)
+        app.insert_classification = object()
+        app.spine_markers = {0: object()}
+
+        app.add_selected_spread_from_diagnosis_spine()
+
+        self.assertEqual([(1, 2)], [(item.start_page, item.end_page) for item in app.diagnosis_session.confirmed_spreads()])
+        self.assertTrue(app.diagnosis_stale)
+        self.assertIsNone(app.insert_classification)
+        self.assertEqual({}, app.spine_markers)
+        self.assertEqual("Added confirmed spread 001-002.", app.status_value)
+        self.assertTrue(app.main_list_refreshed)
+        self.assertTrue(app.diagnose_list_refreshed)
+        self.assertTrue(app.panel_refreshed)
+
+    def test_add_selected_spread_rejects_wrong_selection_count(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2), page(3)])
+        app.diagnosis_session = DiagnosisSession(source_page_count=3)
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=(0, 1, 2)))
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+
+        app.add_selected_spread_from_diagnosis_spine()
+
+        self.assertEqual([], app.diagnosis_session.confirmed_spreads())
+        self.assertEqual("Select exactly two adjacent real pages.", app.status_value)
+
+    def test_add_selected_spread_rejects_blank_or_inserted_rows(self):
+        blank = SimpleNamespace(label="Blank", source_index=None, is_blank=True)
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), blank])
+        app.diagnosis_session = DiagnosisSession(source_page_count=2)
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=(0, 1)))
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+
+        app.add_selected_spread_from_diagnosis_spine()
+
+        self.assertEqual([], app.diagnosis_session.confirmed_spreads())
+        self.assertEqual("Select exactly two adjacent real pages.", app.status_value)
+
+    def test_add_selected_spread_rejects_non_adjacent_source_pages(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(3)])
+        app.diagnosis_session = DiagnosisSession(source_page_count=3)
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=(0, 1)))
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+
+        app.add_selected_spread_from_diagnosis_spine()
+
+        self.assertEqual([], app.diagnosis_session.confirmed_spreads())
+        self.assertEqual("Select exactly two adjacent real pages.", app.status_value)
 
 
 class DiagnosisGuiIntegrationTests(unittest.TestCase):
