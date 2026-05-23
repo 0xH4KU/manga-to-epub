@@ -12,6 +12,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from .fitz_compat import load_fitz
 from .epub_layout_commands import app_commands
 from .epub_layout_diagnosis_controller import (
+    EpubLayoutDiagnosisMixin,
     build_diagnosis_tab,
     initialize_diagnosis_state,
     reset_diagnosis_for_model,
@@ -40,7 +41,7 @@ from .epub_series_model import SeriesProject, SeriesVolume
 fitz = load_fitz()
 
 
-class EpubLayoutApp:
+class EpubLayoutApp(EpubLayoutDiagnosisMixin):
     def __init__(self, root: tk.Tk):
         self.root = root
         self._configure_window()
