@@ -319,6 +319,29 @@ class DiagnosisSelectionSyncTests(unittest.TestCase):
 
         self.assertTrue(app.main_preview_refreshed)
 
+    def test_selection_sync_guard_blocks_reentrant_selection_callbacks(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.page_list = FakeListbox(selection=2)
+        app.reentrant_calls = 0
+
+        class ReentrantListbox(FakeListbox):
+            def selection_set(self, index):
+                super().selection_set(index)
+                app.reentrant_calls += 1
+                app.sync_selection_from_diagnosis()
+
+        app.diagnosis_window = SimpleNamespace(spine_list=ReentrantListbox(selection=None))
+        app.refresh_preview = lambda: setattr(app, "main_preview_refreshed", True)
+        app.refresh_diagnosis_preview = lambda: setattr(app, "diagnosis_preview_refreshed", True)
+        app._syncing_spine_selection = False
+
+        app.sync_selection_from_main()
+
+        self.assertEqual(2, app.diagnosis_window.spine_list.selection)
+        self.assertEqual(1, app.reentrant_calls)
+        self.assertTrue(app.main_preview_refreshed)
+        self.assertTrue(app.diagnosis_preview_refreshed)
+
 
 class DiagnosisWindowLifecycleTests(unittest.TestCase):
     def _panel(self, candidate_selection=None):
