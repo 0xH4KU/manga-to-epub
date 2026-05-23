@@ -13,7 +13,7 @@ from .fitz_compat import load_fitz
 from .epub_layout_commands import app_commands
 from .epub_layout_diagnosis_controller import (
     EpubLayoutDiagnosisMixin,
-    build_diagnosis_tab,
+    build_diagnosis_entry_tab,
     initialize_diagnosis_state,
     reset_diagnosis_for_model,
 )
@@ -224,7 +224,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
         book_tab = self._add_inspector_tab(content, "Book")
         series_tab = self._add_inspector_tab(content, "Series")
         self._build_edit_tab(edit_tab)
-        build_diagnosis_tab(self, diagnose_tab)
+        build_diagnosis_entry_tab(self, diagnose_tab)
         self._build_book_tab(book_tab)
         self._build_series_tab(series_tab)
         self._show_inspector_tab("Edit")
@@ -320,7 +320,8 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
     def _add_panel_button(self, parent: ttk.Frame, text: str, command) -> None:
         ttk.Button(parent, text=text, command=command).pack(fill=tk.X, pady=(6, 0))
 
-    def _commands(self) -> tuple[AppCommand, ...]:
+    @staticmethod
+    def _commands() -> tuple[AppCommand, ...]:
         return app_commands()
 
     def _matching_commands(self, query: str) -> list[AppCommand]:

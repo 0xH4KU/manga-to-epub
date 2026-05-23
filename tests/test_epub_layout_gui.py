@@ -128,6 +128,76 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
         preview_toggle = next(widget for widget in widgets if widget.options.get("text") == "Preview Apple Books cover gap")
         self.assertEqual(app.refresh_preview_after_diagnosis_layout_option_change, preview_toggle.options.get("command"))
 
+    def test_diagnose_inspector_uses_window_entry_point(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = FakeRoot()
+        app.apple_preview = FakeBool(True)
+        app.title_var = SimpleNamespace()
+        app.author_var = SimpleNamespace()
+        app.language_var = SimpleNamespace()
+        app.exclude_cover_var = FakeBool(False)
+        app.inspector_tabs = {}
+        app.inspector_tab_buttons = {}
+        app.status = FakeStatus()
+        app.workspace_status = FakeStatus()
+        app.refresh_preview = lambda: None
+        app.refresh_workspace_status = lambda: None
+        app.open_diagnose_window = lambda: setattr(app, "diagnose_opened", True)
+        buttons = []
+        class FakeFrame(FakeWidget):
+            pass
+        class FakePanedwindow(FakeWidget):
+            pass
+
+        class FakeButton(FakeWidget):
+            def __init__(self, *_args, **kwargs):
+                super().__init__()
+                self.options = kwargs
+                buttons.append(self)
+
+        class FakeLabel(FakeButton):
+            pass
+
+        class FakeCheckbutton(FakeButton):
+            pass
+
+        class FakeListbox(FakeWidget):
+            def bind(self, *_args, **_kwargs):
+                pass
+
+            def yview(self, *_args, **_kwargs):
+                pass
+
+        class FakeCanvas(FakeListbox):
+            def configure(self, **kwargs):
+                self.options.update(kwargs)
+
+            def create_window(self, *_args, **_kwargs):
+                return 1
+
+            def itemconfigure(self, *_args, **_kwargs):
+                pass
+
+            def bbox(self, *_args, **_kwargs):
+                return (0, 0, 1, 1)
+
+        with patch("manga_pdf_to_epub.epub_layout_gui.ttk.Frame", FakeFrame), \
+            patch("manga_pdf_to_epub.epub_layout_gui.ttk.Panedwindow", FakePanedwindow), \
+            patch("manga_pdf_to_epub.epub_layout_gui.ttk.Button", FakeButton), \
+            patch("manga_pdf_to_epub.epub_layout_gui.ttk.Label", FakeLabel), \
+            patch("manga_pdf_to_epub.epub_layout_gui.ttk.Checkbutton", FakeCheckbutton), \
+            patch("manga_pdf_to_epub.epub_layout_gui.ttk.Scrollbar", FakeButton), \
+            patch("manga_pdf_to_epub.epub_layout_gui.ttk.Separator", FakeButton), \
+            patch("manga_pdf_to_epub.epub_layout_gui.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.epub_layout_gui.tk.Listbox", FakeListbox), \
+            patch("manga_pdf_to_epub.epub_layout_gui.tk.Canvas", FakeCanvas):
+            app._build_ui()
+
+        labels = [button.options.get("text") for button in buttons]
+        self.assertIn("Open Diagnose Window", labels)
+        self.assertNotIn("Import Spread Candidates...", labels)
+        self.assertNotIn("Run Cross-Page Scan", labels)
+
     def test_series_tab_omits_old_batch_template_workflow(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.root = FakeRoot()

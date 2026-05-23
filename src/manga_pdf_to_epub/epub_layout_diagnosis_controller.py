@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, simpledialog
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from .epub_layout_diagnosis import (
     DiagnosisSession,
@@ -330,6 +330,10 @@ def build_diagnosis_tab(app, parent) -> None:
         return
     app.diagnosis_panel = DiagnosisPanel(parent, diagnosis_callbacks(app))
     refresh_diagnosis_panel(app)
+
+
+def build_diagnosis_entry_tab(app, parent) -> None:
+    ttk.Button(parent, text="Open Diagnose Window", command=app.open_diagnose_window).pack(fill=tk.X, pady=(6, 0))
 
 
 def diagnosis_callbacks(app) -> DiagnosisPanelCallbacks:
