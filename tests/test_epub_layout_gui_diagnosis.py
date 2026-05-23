@@ -188,6 +188,18 @@ class DiagnosisSpineViewTests(unittest.TestCase):
         self.assertEqual(0.5, app.diagnosis_window.spine_list.moved_to)
         self.assertEqual(1, app.diagnosis_window.spine_list.selection)
 
+    def test_refresh_diagnosis_spine_uses_protected_marker_color(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2)])
+        app.spine_markers = {0: SimpleNamespace(kind="protected", score=0.99)}
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=0))
+        app._is_cover_entry = lambda _entry: False
+
+        app.refresh_diagnosis_spine()
+
+        self.assertIn("[protected]", app.diagnosis_window.spine_list.items[0])
+        self.assertEqual({"foreground": "#9f1d20"}, app.diagnosis_window.spine_list.item_options[0])
+
     def test_refresh_diagnosis_spine_noops_when_window_closed(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.model = SimpleNamespace(entries=[page(1)])
