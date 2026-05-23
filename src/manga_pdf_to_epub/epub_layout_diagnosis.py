@@ -37,6 +37,25 @@ class InsertCandidate:
     reasons: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class SourcePlacement:
+    source_index: int
+    entry_index: int
+    preview_index: int
+    preview_pair_index: int
+
+
+@dataclass(frozen=True)
+class SpreadDamage:
+    pair_id: str
+    start_page: int
+    end_page: int
+    status: Literal["intact", "damaged", "missing"]
+    reason: str
+    start_entry_index: int | None
+    end_entry_index: int | None
+
+
 @dataclass
 class ReviewedSpreadCandidate:
     candidate: SpreadCandidate
@@ -109,6 +128,92 @@ def read_insert_candidates_csv(path: Path) -> list[InsertCandidate]:
 
 def reviewable_insert_candidates(candidates: list[InsertCandidate]) -> list[InsertCandidate]:
     return [item for item in candidates if item.label.startswith(REVIEWABLE_INSERT_LABEL_PREFIXES)]
+
+
+def source_preview_placements(entries: list, uses_apple_cover_gap: bool) -> dict[int, SourcePlacement]:
+    placements: dict[int, SourcePlacement] = {}
+    for entry_index, entry in enumerate(entries):
+        source_index = getattr(entry, "source_index", None)
+        if source_index is None or getattr(entry, "is_blank", False):
+            continue
+        preview_index = entry_index
+        if uses_apple_cover_gap and entry_index >= 1:
+            preview_index += 1
+        placements[source_index] = SourcePlacement(
+            source_index=source_index,
+            entry_index=entry_index,
+            preview_index=preview_index,
+            preview_pair_index=preview_index // 2,
+        )
+    return placements
+
+
+def diagnose_spread_damage(
+    entries: list,
+    confirmed_spreads: list[SpreadCandidate],
+    uses_apple_cover_gap: bool,
+) -> list[SpreadDamage]:
+    placements = source_preview_placements(entries, uses_apple_cover_gap)
+    reports: list[SpreadDamage] = []
+    for spread in confirmed_spreads:
+        start = placements.get(spread.start_page)
+        end = placements.get(spread.end_page)
+        if start is None or end is None:
+            missing = []
+            if start is None:
+                missing.append(f"Page {spread.start_page}")
+            if end is None:
+                missing.append(f"Page {spread.end_page}")
+            reports.append(
+                SpreadDamage(
+                    spread.pair_id,
+                    spread.start_page,
+                    spread.end_page,
+                    "missing",
+                    f"{' and '.join(missing)} missing from current layout",
+                    start.entry_index if start else None,
+                    end.entry_index if end else None,
+                )
+            )
+            continue
+        if start.preview_index + 1 != end.preview_index:
+            reports.append(
+                SpreadDamage(
+                    spread.pair_id,
+                    spread.start_page,
+                    spread.end_page,
+                    "damaged",
+                    "Confirmed pages are in different preview spreads or wrong order",
+                    start.entry_index,
+                    end.entry_index,
+                )
+            )
+            continue
+        if start.preview_pair_index != end.preview_pair_index:
+            reports.append(
+                SpreadDamage(
+                    spread.pair_id,
+                    spread.start_page,
+                    spread.end_page,
+                    "damaged",
+                    "Confirmed pages are in different preview spreads",
+                    start.entry_index,
+                    end.entry_index,
+                )
+            )
+            continue
+        reports.append(
+            SpreadDamage(
+                spread.pair_id,
+                spread.start_page,
+                spread.end_page,
+                "intact",
+                "Confirmed spread is paired in the current preview",
+                start.entry_index,
+                end.entry_index,
+            )
+        )
+    return reports
 
 
 def _read_dict_rows(path: Path, required_columns: set[str]) -> list[dict[str, str]]:
