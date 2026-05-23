@@ -171,6 +171,33 @@ class DiagnosisGuiIntegrationTests(unittest.TestCase):
         self.assertFalse(app.diagnosis_stale)
 
 
+class DiagnosisSpineViewTests(unittest.TestCase):
+    def test_refresh_diagnosis_spine_uses_current_model_rows_and_markers(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2), page(3)])
+        app.spine_markers = {1: SimpleNamespace(kind="suggested", score=0.91)}
+        app.diagnosis_window = SimpleNamespace(spine_list=FakeListbox(selection=1, yview=(0.5, 0.8)))
+        app.refresh_workspace_status = lambda: None
+        app._is_cover_entry = lambda _entry: False
+
+        app.refresh_diagnosis_spine(preserve_yview=True)
+
+        self.assertEqual("0001 [page] Page 1", app.diagnosis_window.spine_list.items[0])
+        self.assertIn("[insert +0.91]", app.diagnosis_window.spine_list.items[1])
+        self.assertEqual({"foreground": "#0b6b2b"}, app.diagnosis_window.spine_list.item_options[1])
+        self.assertEqual(0.5, app.diagnosis_window.spine_list.moved_to)
+        self.assertEqual(1, app.diagnosis_window.spine_list.selection)
+
+    def test_refresh_diagnosis_spine_noops_when_window_closed(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1)])
+        app.diagnosis_window = None
+
+        app.refresh_diagnosis_spine()
+
+        self.assertIsNone(app.diagnosis_window)
+
+
 class DiagnosisWindowLifecycleTests(unittest.TestCase):
     def _panel(self, candidate_selection=None):
         class Var:

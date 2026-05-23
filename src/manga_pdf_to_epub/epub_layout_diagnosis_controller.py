@@ -26,6 +26,28 @@ class EpubLayoutDiagnosisMixin:
     def refresh_diagnosis_panel(self) -> None:
         refresh_diagnosis_panel(self)
 
+    def refresh_diagnosis_spine(self, preserve_yview: bool = False) -> None:
+        window = getattr(self, "diagnosis_window", None)
+        if window is None or getattr(window, "spine_list", None) is None:
+            return
+        if getattr(self, "model", None) is None:
+            return
+        listbox = window.spine_list
+        selected = _first_selection(listbox)
+        yview_start = listbox.yview()[0] if preserve_yview else None
+        listbox.delete(0, tk.END)
+        for index, entry in enumerate(self.model.entries, start=1):
+            row_index = index - 1
+            marker = "[blank]" if entry.is_blank else "[page]"
+            cover = " [cover]" if self._is_cover_entry(entry) else ""
+            spine_marker = self._marker_text_for_entry(row_index)
+            listbox.insert(tk.END, f"{index:04d} {marker}{cover}{spine_marker} {entry.label}")
+            self._apply_spine_marker_color_to_listbox(listbox, row_index)
+        if yview_start is not None:
+            listbox.yview_moveto(yview_start)
+        if selected is not None and self.model.entries:
+            listbox.selection_set(min(selected, len(self.model.entries) - 1))
+
     def open_diagnose_window(self) -> None:
         if getattr(self, "model", None) is None:
             self.status.set("Open a PDF before opening Diagnose.")
@@ -147,12 +169,15 @@ class EpubLayoutDiagnosisMixin:
         return " [protected]"
 
     def _apply_spine_marker_color(self, row_index: int) -> None:
+        self._apply_spine_marker_color_to_listbox(self.page_list, row_index)
+
+    def _apply_spine_marker_color_to_listbox(self, listbox, row_index: int) -> None:
         marker = getattr(self, "spine_markers", {}).get(row_index)
         if marker is None:
             return
         color = "#0b6b2b" if marker.kind == "suggested" else "#9f1d20"
         try:
-            self.page_list.itemconfig(row_index, foreground=color)
+            listbox.itemconfig(row_index, foreground=color)
         except tk.TclError:
             pass
 
@@ -382,6 +407,11 @@ def _diagnosis_panels(app) -> list[DiagnosisPanel]:
     if window_panel is not None and window_panel is not inspector_panel:
         panels.append(window_panel)
     return panels
+
+
+def _first_selection(listbox) -> int | None:
+    selection = listbox.curselection()
+    return selection[0] if selection else None
 
 
 def _replace_list_preserving_yview(listbox, rows: list[str]) -> None:
