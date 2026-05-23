@@ -33,7 +33,7 @@ class EpubLayoutDiagnosisMixin:
         if getattr(self, "model", None) is None:
             return
         listbox = window.spine_list
-        selected = _first_selection(listbox)
+        selected = _listbox_selection(listbox)
         yview_start = listbox.yview()[0] if preserve_yview else None
         listbox.delete(0, tk.END)
         for index, entry in enumerate(self.model.entries, start=1):
@@ -45,8 +45,7 @@ class EpubLayoutDiagnosisMixin:
             self._apply_spine_marker_color_to_listbox(listbox, row_index)
         if yview_start is not None:
             listbox.yview_moveto(yview_start)
-        if selected is not None and self.model.entries:
-            listbox.selection_set(min(selected, len(self.model.entries) - 1))
+        _restore_listbox_selection(listbox, selected, len(self.model.entries))
 
     def open_diagnose_window(self) -> None:
         if getattr(self, "model", None) is None:
@@ -57,6 +56,7 @@ class EpubLayoutDiagnosisMixin:
             existing.focus()
             return
         self.diagnosis_window = DiagnosisWindow(self, self.root, diagnosis_callbacks(self))
+        self.refresh_diagnosis_spine()
         self.refresh_diagnosis_panel()
 
     def _diagnose_window_closed(self, closed_window=None) -> None:
@@ -412,6 +412,17 @@ def _diagnosis_panels(app) -> list[DiagnosisPanel]:
 def _first_selection(listbox) -> int | None:
     selection = listbox.curselection()
     return selection[0] if selection else None
+
+
+def _listbox_selection(listbox) -> tuple[int, ...]:
+    return tuple(listbox.curselection())
+
+
+def _restore_listbox_selection(listbox, selection: tuple[int, ...], entry_count: int) -> None:
+    if not selection or entry_count <= 0:
+        return
+    for index in selection:
+        listbox.selection_set(min(index, entry_count - 1))
 
 
 def _replace_list_preserving_yview(listbox, rows: list[str]) -> None:

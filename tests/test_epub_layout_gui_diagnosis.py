@@ -172,6 +172,23 @@ class DiagnosisGuiIntegrationTests(unittest.TestCase):
 
 
 class DiagnosisSpineViewTests(unittest.TestCase):
+    def test_open_diagnose_window_refreshes_spine_rows(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = object()
+        app.model = SimpleNamespace(entries=[page(1), page(2)])
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+        app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app._is_cover_entry = lambda _entry: False
+
+        class FakeDiagnosisWindow:
+            def __init__(self, *_args):
+                self.spine_list = FakeListbox(selection=None)
+
+        with patch("manga_pdf_to_epub.epub_layout_diagnosis_controller.DiagnosisWindow", FakeDiagnosisWindow):
+            app.open_diagnose_window()
+
+        self.assertEqual(["0001 [page] Page 1", "0002 [page] Page 2"], app.diagnosis_window.spine_list.items)
+
     def test_refresh_diagnosis_spine_uses_current_model_rows_and_markers(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.model = SimpleNamespace(entries=[page(1), page(2), page(3)])
@@ -187,6 +204,28 @@ class DiagnosisSpineViewTests(unittest.TestCase):
         self.assertEqual({"foreground": "#0b6b2b"}, app.diagnosis_window.spine_list.item_options[1])
         self.assertEqual(0.5, app.diagnosis_window.spine_list.moved_to)
         self.assertEqual(1, app.diagnosis_window.spine_list.selection)
+
+    def test_refresh_diagnosis_spine_preserves_multiple_selected_rows(self):
+        class SelectionClearingListbox(FakeListbox):
+            def delete(self, *args):
+                super().delete(*args)
+                self.selection = None
+
+            def selection_set(self, index):
+                if self.selection is None:
+                    self.selection = (index,)
+                else:
+                    self.selection = (*self.curselection(), index)
+
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2), page(3)])
+        app.spine_markers = {}
+        app.diagnosis_window = SimpleNamespace(spine_list=SelectionClearingListbox(selection=(0, 1)))
+        app._is_cover_entry = lambda _entry: False
+
+        app.refresh_diagnosis_spine()
+
+        self.assertEqual((0, 1), app.diagnosis_window.spine_list.selection)
 
     def test_refresh_diagnosis_spine_uses_protected_marker_color(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
