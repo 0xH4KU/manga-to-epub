@@ -208,6 +208,9 @@ class EpubLayoutDiagnosisMixin:
             f"Checked {len(confirmed)} confirmed spreads: {damaged_count} damaged, {missing_count} missing."
         )
 
+    def recheck_diagnosis_layout(self) -> None:
+        self.check_confirmed_spread_damage()
+
     def mark_selected_spread_true(self) -> None:
         self._mark_selected_spread("true", "true spread")
 
@@ -294,7 +297,7 @@ def diagnosis_callbacks(app) -> DiagnosisPanelCallbacks:
         run_insert_point_scoring=app.run_insert_point_scoring,
         import_insert_scores=app.import_insert_scores,
         insert_selected_diagnosis_blank=app.insert_selected_diagnosis_blank,
-        recheck_diagnosis_layout=lambda: _stub_status(app, "Layout recheck will be wired in a later task."),
+        recheck_diagnosis_layout=app.recheck_diagnosis_layout,
     )
 
 

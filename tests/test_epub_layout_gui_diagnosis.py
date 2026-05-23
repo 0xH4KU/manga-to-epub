@@ -257,6 +257,26 @@ class DiagnosisDamageWorkflowTests(unittest.TestCase):
 
         self.assertEqual("Mark at least one true spread before checking damage.", app.status_value)
 
+    def test_recheck_layout_runs_damage_check_from_stale_state(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(index) for index in range(1, 41)])
+        app.apple_preview = SimpleNamespace(get=lambda: True)
+        app.diagnosis_session = DiagnosisSession(source_page_count=40)
+        app.diagnosis_session.add_manual_spread(37, 38)
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+        app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "list_preserved", preserve_yview)
+        app.spread_damage = []
+        app.insert_classification = "old"
+        app.spine_markers = {0: object()}
+        app.diagnosis_stale = True
+
+        app.recheck_diagnosis_layout()
+
+        self.assertEqual("damaged", app.spread_damage[0].status)
+        self.assertFalse(app.diagnosis_stale)
+        self.assertEqual("Checked 1 confirmed spreads: 1 damaged, 0 missing.", app.status_value)
+
 
 class DiagnosisSpreadScanWorkflowTests(unittest.TestCase):
     def test_spread_scan_work_reads_candidates_in_background_phase(self):
