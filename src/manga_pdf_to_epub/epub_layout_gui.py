@@ -115,7 +115,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
         self.delete_selected_entry()
         return None
 
-    def _run_background(self, status_message: str, work, on_success) -> bool:
+    def _run_background(self, status_message: str, work, on_success, on_failure=None) -> bool:
         if getattr(self, "_busy", False):
             self.status.set("Another operation is already running.")
             return False
@@ -128,7 +128,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
                 result = work()
                 self.root.after(0, lambda: self._background_done(result, on_success))
             except Exception as exc:
-                self.root.after(0, lambda: self._background_failed(exc))
+                self.root.after(0, lambda: self._background_failed(exc, on_failure))
 
         threading.Thread(target=worker, daemon=True).start()
         return True
@@ -137,9 +137,12 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
         self._busy = False
         on_success(result)
 
-    def _background_failed(self, exc: Exception) -> None:
+    def _background_failed(self, exc: Exception, on_failure=None) -> None:
         self._busy = False
-        self._export_failed(exc)
+        if on_failure is None:
+            self._export_failed(exc)
+        else:
+            on_failure(exc)
 
     def _build_ui(self) -> None:
         toolbar = ttk.Frame(self.root, padding=8)

@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -11,6 +12,7 @@ from manga_pdf_to_epub.epub_layout_diagnosis import (
     diagnose_spread_damage,
 )
 from manga_pdf_to_epub.epub_layout_gui import EpubLayoutApp
+from manga_pdf_to_epub.epub_layout_diagnosis_controller import _run_spread_scan_work
 from manga_pdf_to_epub.epub_layout_diagnosis_gui import (
     DiagnosisPanel,
     DiagnosisPanelCallbacks,
@@ -253,6 +255,47 @@ class DiagnosisDamageWorkflowTests(unittest.TestCase):
         app.check_confirmed_spread_damage()
 
         self.assertEqual("Mark at least one true spread before checking damage.", app.status_value)
+
+
+class DiagnosisSpreadScanWorkflowTests(unittest.TestCase):
+    def test_spread_scan_work_reads_candidates_in_background_phase(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            (output_dir / "adjacent_clusters.csv").write_text(
+                "start_page,end_page,decision,spread,review_score\n37,38,review,0.91,0.88\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "manga_pdf_to_epub.epub_layout_diagnosis_controller.run_diagnosis_command",
+                return_value=SimpleNamespace(output_dir=output_dir),
+            ):
+                candidates = _run_spread_scan_work(SimpleNamespace())
+
+        self.assertEqual(["037-038"], [candidate.pair_id for candidate in candidates])
+
+    def test_spread_scan_done_loads_parsed_candidates(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.diagnosis_session = DiagnosisSession(source_page_count=50)
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+        app.refresh_diagnosis_panel = lambda: None
+        app.refresh_list = lambda preserve_yview=False: None
+        app.spine_markers = {}
+
+        app._spread_scan_done([SpreadCandidate("037-038", 37, 38, 0.91, 0.88, "review")])
+
+        self.assertEqual(["037-038"], [item.candidate.pair_id for item in app.diagnosis_session.spread_candidates()])
+        self.assertEqual("Loaded 1 spread candidates for review.", app.status_value)
+
+    def test_spread_scan_failure_uses_scan_specific_status_and_dialog(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+
+        with patch("manga_pdf_to_epub.epub_layout_diagnosis_controller.messagebox.showerror") as showerror:
+            app._spread_scan_failed(ValueError("bad csv"))
+
+        self.assertEqual("Cross-page scan failed.", app.status_value)
+        showerror.assert_called_once_with("Cross-page scan failed", "bad csv")
 
 
 if __name__ == "__main__":
