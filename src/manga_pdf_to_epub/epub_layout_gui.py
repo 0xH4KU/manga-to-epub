@@ -1138,11 +1138,11 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
     ) -> None:
         if mark_edited:
             self._mark_diagnosis_stale()
-        self.refresh_list(preserve_yview=preserve_yview)
+        self.refresh_spine_views(preserve_yview=preserve_yview)
         self.page_list.selection_clear(0, tk.END)
         if select_index is not None:
             self.page_list.selection_set(select_index)
-        self.refresh_preview()
+        self.refresh_preview_views()
         if mark_edited:
             self._mark_active_volume_edited()
 

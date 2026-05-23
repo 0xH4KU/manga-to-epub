@@ -249,6 +249,43 @@ class DiagnosisManualSpreadSelectionTests(unittest.TestCase):
         self.assertEqual("Select exactly two adjacent real pages.", app.status_value)
 
 
+class DiagnosisViewRefreshTests(unittest.TestCase):
+    def test_loading_candidates_refreshes_main_and_diagnose_spines(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.diagnosis_session = DiagnosisSession(source_page_count=50)
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "main_refreshed", preserve_yview)
+        app.refresh_diagnosis_spine = lambda preserve_yview=False: setattr(app, "diagnose_refreshed", preserve_yview)
+        app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.spine_markers = {0: object()}
+
+        app._load_spread_candidates([SpreadCandidate("003-004", 3, 4, 0.9, 0.8, "review")])
+
+        self.assertTrue(app.main_refreshed)
+        self.assertTrue(getattr(app, "diagnose_refreshed", False))
+        self.assertTrue(app.panel_refreshed)
+
+    def test_layout_edit_refreshes_diagnose_spine_when_window_open(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.page_list = FakeListbox(selection=0)
+        app.diagnosis_stale = False
+        app.insert_classification = object()
+        app.spine_markers = {0: object()}
+        app.refresh_list = lambda preserve_yview=False: setattr(app, "main_refreshed", preserve_yview)
+        app.refresh_diagnosis_spine = lambda preserve_yview=False: setattr(app, "diagnose_refreshed", preserve_yview)
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+        app.refresh_diagnosis_preview = lambda: setattr(app, "diagnosis_preview_refreshed", True)
+        app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app._mark_active_volume_edited = lambda: None
+
+        app._refresh_after_layout_edit(select_index=0)
+
+        self.assertTrue(app.main_refreshed)
+        self.assertTrue(getattr(app, "diagnose_refreshed", False))
+        self.assertTrue(app.preview_refreshed)
+        self.assertTrue(getattr(app, "diagnosis_preview_refreshed", False))
+
+
 class DiagnosisGuiIntegrationTests(unittest.TestCase):
     def test_new_pdf_resets_diagnosis_state(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

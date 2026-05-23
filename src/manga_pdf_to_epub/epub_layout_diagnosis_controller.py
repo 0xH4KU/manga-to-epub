@@ -23,6 +23,14 @@ from .epub_layout_diagnosis_runner import (
 
 
 class EpubLayoutDiagnosisMixin:
+    def refresh_spine_views(self, preserve_yview: bool = False) -> None:
+        self.refresh_list(preserve_yview=preserve_yview)
+        self.refresh_diagnosis_spine(preserve_yview=preserve_yview)
+
+    def refresh_preview_views(self) -> None:
+        self.refresh_preview()
+        self.refresh_diagnosis_preview()
+
     def refresh_diagnosis_panel(self) -> None:
         refresh_diagnosis_panel(self)
 
@@ -148,7 +156,7 @@ class EpubLayoutDiagnosisMixin:
         self.insert_classification = None
         self.diagnosis_stale = False
         self.spine_markers = {}
-        self.refresh_list(preserve_yview=True)
+        self.refresh_spine_views(preserve_yview=True)
         self.refresh_diagnosis_panel()
         self.status.set(f"Loaded {len(candidates)} spread candidates for review.")
 
@@ -199,7 +207,7 @@ class EpubLayoutDiagnosisMixin:
         for item in self.insert_classification.suggestions:
             self.spine_markers[item.marker_entry_index] = item
         self.diagnosis_stale = False
-        self.refresh_list(preserve_yview=True)
+        self.refresh_spine_views(preserve_yview=True)
         self.refresh_diagnosis_panel()
         suggested_count = len(self.insert_classification.suggestions)
         protected_count = len(self.insert_classification.protected)
@@ -238,10 +246,10 @@ class EpubLayoutDiagnosisMixin:
 
     def _refresh_spine_preserving_selection(self) -> None:
         if not hasattr(self, "page_list"):
-            self.refresh_list(preserve_yview=True)
+            self.refresh_spine_views(preserve_yview=True)
             return
         selected = self.selected_index()
-        self.refresh_list(preserve_yview=True)
+        self.refresh_spine_views(preserve_yview=True)
         if selected is not None and getattr(self, "model", None) is not None and self.model.entries:
             self.page_list.selection_set(min(selected, len(self.model.entries) - 1))
 
@@ -313,7 +321,7 @@ class EpubLayoutDiagnosisMixin:
         self.insert_classification = None
         self.spine_markers = {}
         self.diagnosis_stale = False
-        self.refresh_list(preserve_yview=True)
+        self.refresh_spine_views(preserve_yview=True)
         self.refresh_diagnosis_panel()
         damaged_count = sum(1 for item in self.spread_damage if item.status == "damaged")
         missing_count = sum(1 for item in self.spread_damage if item.status == "missing")
@@ -376,7 +384,7 @@ class EpubLayoutDiagnosisMixin:
 
     def refresh_preview_after_diagnosis_layout_option_change(self) -> None:
         self._mark_diagnosis_stale(refresh_spine=True)
-        self.refresh_preview()
+        self.refresh_preview_views()
 
     def import_spread_candidates(self) -> None:
         path = filedialog.askopenfilename(
