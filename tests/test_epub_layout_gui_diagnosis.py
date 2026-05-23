@@ -12,12 +12,13 @@ from manga_pdf_to_epub.epub_layout_diagnosis import (
     diagnose_spread_damage,
 )
 from manga_pdf_to_epub.epub_layout_gui import EpubLayoutApp
-from manga_pdf_to_epub.epub_layout_diagnosis_controller import _run_spread_scan_work
+from manga_pdf_to_epub.epub_layout_diagnosis_controller import _run_insert_scoring_work, _run_spread_scan_work
 from manga_pdf_to_epub.epub_layout_diagnosis_gui import (
     DiagnosisPanel,
     DiagnosisPanelCallbacks,
     diagnosis_summary_texts,
 )
+from tests.gui_helpers import FakeListbox
 
 
 def page(source_index: int):
@@ -311,6 +312,94 @@ class DiagnosisSpreadScanWorkflowTests(unittest.TestCase):
 
         self.assertEqual("Cross-page scan failed.", app.status_value)
         showerror.assert_called_once_with("Cross-page scan failed", "bad csv")
+
+
+class DiagnosisInsertWorkflowTests(unittest.TestCase):
+    def test_insert_scores_classify_and_refresh_spine_markers(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(index) for index in range(1, 41)])
+        app.apple_preview = SimpleNamespace(get=lambda: True)
+        app.diagnosis_session = DiagnosisSession(source_page_count=40)
+        app.diagnosis_session.add_manual_spread(37, 38)
+        app.spread_damage = diagnose_spread_damage(app.model.entries, app.diagnosis_session.confirmed_spreads(), True)
+        app.page_list = FakeListbox(selection=0)
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+        app.refresh_diagnosis_panel = lambda: setattr(app, "panel_refreshed", True)
+        app.refresh_workspace_status = lambda: None
+        app._is_cover_entry = lambda _entry: False
+
+        app._load_insert_candidates(
+            [
+                InsertCandidate("034-035", 34, 35, 0.94, "C scene_change", 0.7, 0.2, ("scene change",)),
+                InsertCandidate("037-038", 37, 38, 0.99, "B low_content_pause", 0.8, 0.1, ("low content",)),
+            ]
+        )
+
+        self.assertEqual(1, len(app.insert_classification.suggestions))
+        self.assertIn("insert +0.94", app.page_list.items[34])
+        self.assertIn("protected", app.page_list.items[37])
+        self.assertEqual({"foreground": "#0b6b2b"}, app.page_list.item_options[34])
+        self.assertEqual({"foreground": "#9f1d20"}, app.page_list.item_options[37])
+        self.assertEqual("Loaded 2 insert scores: 1 suggested, 1 protected.", app.status_value)
+        self.assertTrue(app.panel_refreshed)
+
+    def test_insert_score_import_requires_damage_check_first(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2)])
+        app.spread_damage = []
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+
+        app._load_insert_candidates([InsertCandidate("001-002", 1, 2, 0.9, "C scene_change", 0.7, 0.2, ())])
+
+        self.assertEqual("Check confirmed spread damage before loading insert scores.", app.status_value)
+
+    def test_import_insert_scores_reads_csv_and_loads_candidates(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.loaded = None
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "gaps.csv"
+            path.write_text(
+                "gap,after_page,before_page,safe_insert_score,label,visual_difference,continuity_risk,reasons\n"
+                "034-035,34,35,0.94,C scene_change,0.7,0.2,scene change\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "manga_pdf_to_epub.epub_layout_diagnosis_controller.filedialog.askopenfilename",
+                return_value=str(path),
+            ):
+                app._load_insert_candidates = lambda candidates: setattr(app, "loaded", candidates)
+                app.import_insert_scores()
+
+        self.assertEqual(["034-035"], [candidate.gap_id for candidate in app.loaded])
+
+    def test_run_insert_scoring_work_reads_gaps_csv(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            (output_dir / "gaps.csv").write_text(
+                "gap,after_page,before_page,safe_insert_score,label,visual_difference,continuity_risk,reasons\n"
+                "034-035,34,35,0.94,C scene_change,0.7,0.2,scene change\n",
+                encoding="utf-8",
+            )
+
+            with patch(
+                "manga_pdf_to_epub.epub_layout_diagnosis_controller.run_diagnosis_command",
+                return_value=SimpleNamespace(output_dir=output_dir),
+            ):
+                candidates = _run_insert_scoring_work(SimpleNamespace())
+
+        self.assertEqual(["034-035"], [candidate.gap_id for candidate in candidates])
+
+    def test_insert_scoring_failure_uses_scoring_specific_status_and_dialog(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+
+        with patch("manga_pdf_to_epub.epub_layout_diagnosis_controller.messagebox.showerror") as showerror:
+            app._insert_scoring_failed(ValueError("bad gaps"))
+
+        self.assertEqual("Insert-point scoring failed.", app.status_value)
+        showerror.assert_called_once_with("Insert-point scoring failed", "bad gaps")
 
 
 if __name__ == "__main__":

@@ -817,7 +817,10 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin):
         for i, entry in enumerate(self.model.entries, start=1):
             marker = "[blank]" if entry.is_blank else "[page]"
             cover = " [cover]" if self._is_cover_entry(entry) else ""
-            self.page_list.insert(tk.END, f"{i:04d} {marker}{cover} {entry.label}")
+            row_index = i - 1
+            spine_marker = self._marker_text_for_entry(row_index)
+            self.page_list.insert(tk.END, f"{i:04d} {marker}{cover}{spine_marker} {entry.label}")
+            self._apply_spine_marker_color(row_index)
         if yview_start is not None:
             self.page_list.yview_moveto(yview_start)
         self.refresh_workspace_status()

@@ -6,13 +6,17 @@ from tkinter import filedialog, messagebox, simpledialog
 
 from .epub_layout_diagnosis import (
     DiagnosisSession,
+    InsertCandidate,
     SpreadCandidate,
+    classify_insert_points,
     diagnose_spread_damage,
+    read_insert_candidates_csv,
     read_spread_candidates_csv,
 )
 from .epub_layout_diagnosis_gui import DiagnosisPanel, DiagnosisPanelCallbacks, diagnosis_summary_texts
 from .epub_layout_diagnosis_runner import (
     default_diagnosis_output_dir,
+    resolve_insert_score_command,
     resolve_spread_scan_command,
     run_diagnosis_command,
 )
@@ -68,6 +72,91 @@ class EpubLayoutDiagnosisMixin:
     def _spread_scan_failed(self, exc: Exception) -> None:
         self.status.set("Cross-page scan failed.")
         messagebox.showerror("Cross-page scan failed", str(exc))
+
+    def _load_insert_candidates(self, candidates: list[InsertCandidate]) -> None:
+        if getattr(self, "model", None) is None:
+            return
+        if not getattr(self, "spread_damage", []):
+            self.status.set("Check confirmed spread damage before loading insert scores.")
+            return
+        if getattr(self, "diagnosis_session", None) is None:
+            return
+        self.insert_candidates = candidates
+        self.insert_classification = classify_insert_points(
+            self.model.entries,
+            self.diagnosis_session.confirmed_spreads(),
+            candidates,
+            self.apple_preview.get(),
+        )
+        self.spine_markers = {}
+        for item in self.insert_classification.protected:
+            self.spine_markers[item.insertion_index] = item
+        for item in self.insert_classification.suggestions:
+            self.spine_markers[item.insertion_index] = item
+        self.diagnosis_stale = False
+        self.refresh_list(preserve_yview=True)
+        self.refresh_diagnosis_panel()
+        suggested_count = len(self.insert_classification.suggestions)
+        protected_count = len(self.insert_classification.protected)
+        self.status.set(
+            f"Loaded {len(candidates)} insert scores: {suggested_count} suggested, {protected_count} protected."
+        )
+
+    def _marker_text_for_entry(self, row_index: int) -> str:
+        marker = getattr(self, "spine_markers", {}).get(row_index)
+        if marker is None:
+            return ""
+        if marker.kind == "suggested":
+            return f" [insert +{marker.score:.2f}]"
+        return " [protected]"
+
+    def _apply_spine_marker_color(self, row_index: int) -> None:
+        marker = getattr(self, "spine_markers", {}).get(row_index)
+        if marker is None:
+            return
+        color = "#0b6b2b" if marker.kind == "suggested" else "#9f1d20"
+        try:
+            self.page_list.itemconfig(row_index, foreground=color)
+        except tk.TclError:
+            pass
+
+    def import_insert_scores(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Import insert scores",
+            filetypes=(("CSV files", "*.csv"), ("All files", "*.*")),
+        )
+        if not path:
+            return
+        try:
+            self._load_insert_candidates(read_insert_candidates_csv(Path(path)))
+        except ValueError as exc:
+            messagebox.showerror("Import Insert Scores", str(exc))
+
+    def run_insert_point_scoring(self) -> None:
+        if getattr(self, "model", None) is None or getattr(self, "pdf_path", None) is None:
+            return
+        project_root = Path(__file__).resolve().parents[2]
+        output_dir = default_diagnosis_output_dir(project_root, self.pdf_path, "insert")
+        command = resolve_insert_score_command(project_root, self.pdf_path, output_dir)
+        if command is None:
+            messagebox.showerror(
+                "Insert scoring unavailable",
+                "Could not find sibling manga-insert-point-scorer environment. Use Import Insert Scores instead.",
+            )
+            return
+        self._run_background(
+            "Running insert-point scoring. This can take a few minutes.",
+            lambda: _run_insert_scoring_work(command),
+            self._insert_scoring_done,
+            on_failure=self._insert_scoring_failed,
+        )
+
+    def _insert_scoring_done(self, candidates: list[InsertCandidate]) -> None:
+        self._load_insert_candidates(candidates)
+
+    def _insert_scoring_failed(self, exc: Exception) -> None:
+        self.status.set("Insert-point scoring failed.")
+        messagebox.showerror("Insert-point scoring failed", str(exc))
 
     def check_confirmed_spread_damage(self) -> None:
         if getattr(self, "model", None) is None or getattr(self, "diagnosis_session", None) is None:
@@ -171,8 +260,8 @@ def diagnosis_callbacks(app) -> DiagnosisPanelCallbacks:
         mark_selected_spread_false=app.mark_selected_spread_false,
         add_missing_spread=app.add_missing_spread,
         check_confirmed_spread_damage=app.check_confirmed_spread_damage,
-        run_insert_point_scoring=lambda: _stub_status(app, "Insert-point scoring will be wired in a later task."),
-        import_insert_scores=lambda: _stub_status(app, "Insert score import will be wired in a later task."),
+        run_insert_point_scoring=app.run_insert_point_scoring,
+        import_insert_scores=app.import_insert_scores,
         insert_selected_diagnosis_blank=lambda: _stub_status(app, "Blank insertion from diagnosis will be wired in a later task."),
         recheck_diagnosis_layout=lambda: _stub_status(app, "Layout recheck will be wired in a later task."),
     )
@@ -242,3 +331,8 @@ def _run_spread_scan_work(command, source_page_count: int = 0) -> list[SpreadCan
     candidates = read_spread_candidates_csv(result.output_dir / "adjacent_clusters.csv")
     DiagnosisSession(source_page_count).load_spread_candidates(candidates)
     return candidates
+
+
+def _run_insert_scoring_work(command) -> list[InsertCandidate]:
+    result = run_diagnosis_command(command)
+    return read_insert_candidates_csv(result.output_dir / "gaps.csv")

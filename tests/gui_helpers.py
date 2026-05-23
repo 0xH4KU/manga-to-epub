@@ -32,6 +32,7 @@ class FakeListbox:
         self.selection = selection
         self.current_yview = yview
         self.moved_to = None
+        self.item_options = {}
 
     def curselection(self):
         if self.selection is None:
@@ -66,6 +67,9 @@ class FakeListbox:
         if not self.items:
             return 0
         return min(max(int(y), 0), len(self.items) - 1)
+
+    def itemconfig(self, index, **kwargs):
+        self.item_options[index] = kwargs
 
 
 class FakeStatus:
