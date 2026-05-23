@@ -113,6 +113,13 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
 
         self.assertIn("Open Diagnose Window", commands)
 
+    def test_command_palette_finds_diagnose_window_by_diagnosis_keyword(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+
+        labels = [command.label for command in app._matching_commands("diagnosis")]
+
+        self.assertIn("Open Diagnose Window", labels)
+
     def test_command_palette_dispatches_bulk_delete_actions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.ask_delete_range = lambda: setattr(app, "range_delete_opened", True)

@@ -16,7 +16,7 @@ def app_commands() -> tuple[AppCommand, ...]:
         AppCommand("Open Project", "open_project", keywords=("series", "project")),
         AppCommand("Save Preset", "save_preset", keywords=("layout",)),
         AppCommand("Load Preset", "load_preset", keywords=("layout",)),
-        AppCommand("Open Diagnose Window", "open_diagnose_window"),
+        AppCommand("Open Diagnose Window", "open_diagnose_window", keywords=("diagnosis",)),
         AppCommand("Insert Blank Before", "insert_blank", (True,), ("page",)),
         AppCommand("Insert Blank After", "insert_blank", (False,), ("page",)),
         AppCommand("Insert Image Before", "insert_image", (True,), ("page",)),

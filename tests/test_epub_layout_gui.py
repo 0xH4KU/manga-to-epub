@@ -193,10 +193,10 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             patch("manga_pdf_to_epub.epub_layout_gui.tk.Canvas", FakeCanvas):
             app._build_ui()
 
-        labels = [button.options.get("text") for button in buttons]
-        self.assertIn("Open Diagnose Window", labels)
-        self.assertNotIn("Import Spread Candidates...", labels)
-        self.assertNotIn("Run Cross-Page Scan", labels)
+        button_by_label = {button.options.get("text"): button for button in buttons}
+        self.assertIn("Open Diagnose Window", button_by_label)
+        self.assertTrue({"Import Spread Candidates...", "Run Cross-Page Scan"}.isdisjoint(button_by_label))
+        self.assertTrue(button_by_label["Open Diagnose Window"].options["command"]() is None and app.diagnose_opened)
 
     def test_series_tab_omits_old_batch_template_workflow(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
