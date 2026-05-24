@@ -1,4 +1,4 @@
-# Manga PDF to EPUB
+# Manga to EPUB
 
 Lossless manga-source to EPUB tools for readers who care about page pairing, cover gaps, and Apple Books layout quirks.
 
@@ -30,7 +30,7 @@ This tool focuses on the boring-but-crucial details:
 
 - PDF, CBZ, and ZIP to EPUB without image recompression for JPEG/PNG archive pages.
 - PDF Flate image streams are wrapped into PNG containers.
-- Archive WebP, BMP, TIFF, and GIF pages are converted to PNG for EPUB compatibility.
+- Archive WebP, BMP, TIFF, GIF, AVIF, HEIC/HEIF, and JPEG 2000 pages are converted to PNG for EPUB compatibility.
 - Tkinter GUI for manual manga layout tuning.
 - Preview-only Apple Books cover-gap mode with a virtual blank page on the right of the first spine item.
 - Arbitrary blank page insertion before or after selected pages.
@@ -46,7 +46,7 @@ This tool focuses on the boring-but-crucial details:
 Use Python 3.11 or newer. Tkinter is included with the standard Python.org macOS installer and most system Python builds.
 
 ```bash
-cd ~/manga-pdf-to-epub
+cd ~/manga-to-epub
 make setup
 ```
 
@@ -141,17 +141,19 @@ Version 1 presets from earlier builds still load. When a v2 preset references an
 Convert PDF, CBZ, or ZIP files to fixed-layout EPUB:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" --overwrite
+.venv/bin/manga-to-epub "Volume 01.pdf" --overwrite
 ```
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.cbz" --overwrite
+.venv/bin/manga-to-epub "Volume 01.cbz" --overwrite
 ```
+
+The older `pdf-to-epub-lossless` command remains available as a compatibility alias.
 
 Insert one real blank page before the cover:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
+.venv/bin/manga-to-epub "Volume 01.pdf" \
   --blank-pages-before-cover 1 \
   --overwrite
 ```
@@ -159,7 +161,7 @@ Insert one real blank page before the cover:
 Export multiple sources into a directory:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless *.pdf *.cbz *.zip \
+.venv/bin/manga-to-epub *.pdf *.cbz *.zip \
   --output-dir ./epub-output \
   --overwrite
 ```
@@ -167,7 +169,7 @@ Export multiple sources into a directory:
 Set EPUB metadata and use source page 2 as cover art only:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
+.venv/bin/manga-to-epub "Volume 01.pdf" \
   --title "Series Vol.01" \
   --author "Author Name" \
   --language ja \
@@ -179,7 +181,7 @@ Set EPUB metadata and use source page 2 as cover art only:
 Apply a GUI layout preset or quick-delete pages without opening the GUI:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
+.venv/bin/manga-to-epub "Volume 01.pdf" \
   --preset ./layout-preset.json \
   --delete-range 1-3 \
   --overwrite
@@ -188,7 +190,7 @@ Apply a GUI layout preset or quick-delete pages without opening the GUI:
 Inserted images use `POSITION=PATH` with 1-based spine positions:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
+.venv/bin/manga-to-epub "Volume 01.pdf" \
   --insert-image-after 1=./cover.png \
   --overwrite
 ```
@@ -196,7 +198,7 @@ Inserted images use `POSITION=PATH` with 1-based spine positions:
 For series-style generated titles, use `--series-title` with either `--volume-number` or a filename that contains a volume number:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 07.pdf" \
+.venv/bin/manga-to-epub "Volume 07.pdf" \
   --series-title "Series Title" \
   --volume-number 7 \
   --overwrite
@@ -222,7 +224,7 @@ The converter avoids recompressing source artwork where the PDF stores JPEG imag
 
 For Flate-compressed PDF image streams, the tool wraps the image data into PNG. If the PDF uses PNG-style predictors, the compressed rows can be reused inside the PNG container. Unsupported PDF color spaces or filter chains raise an error instead of silently degrading output.
 
-For CBZ/ZIP sources, entries are naturally sorted, common junk files such as `__MACOSX/` and `.DS_Store` are ignored, JPEG/PNG pages are preserved, and WebP/BMP/TIFF/GIF pages are decoded with Pillow and written as PNG. Animated GIFs and multi-page TIFFs use the first frame/page.
+For CBZ/ZIP sources, entries are naturally sorted, common junk files such as `__MACOSX/` and `.DS_Store` are ignored, JPEG/JFIF and PNG/APNG pages are preserved, and WebP/BMP/TIFF/GIF/AVIF/HEIC/HEIF/JPEG 2000 pages are decoded and written as PNG. Animated GIFs and multi-page TIFFs use the first frame/page.
 
 ## Project Files
 

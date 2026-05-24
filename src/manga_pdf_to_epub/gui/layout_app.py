@@ -151,7 +151,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
         toolbar_row.pack(anchor=tk.CENTER)
         toolbar_buttons = (
             ("Import Series...", self.import_series),
-            ("Open PDF", self.open_pdf),
+            ("Open Source", self.open_pdf),
             ("Export EPUB", self.export_epub),
             ("Export Ready Series...", self.export_ready_series),
             ("Open Project...", self.open_project),

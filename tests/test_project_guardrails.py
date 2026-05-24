@@ -7,12 +7,14 @@ class ProjectGuardrailTests(unittest.TestCase):
     def test_root_only_keeps_project_level_files(self):
         self.assertFalse(Path("epub_layout_gui.py").exists())
         self.assertFalse(Path("pdf_to_epub_lossless.py").exists())
+        self.assertTrue(Path("scripts/manga_to_epub.py").exists())
         self.assertTrue(Path("scripts/epub_layout_gui.py").exists())
         self.assertTrue(Path("scripts/pdf_to_epub_lossless.py").exists())
 
     def test_source_modules_are_grouped_by_responsibility(self):
         expected_packages = [
             Path("src/manga_pdf_to_epub/pdf"),
+            Path("src/manga_pdf_to_epub/sources"),
             Path("src/manga_pdf_to_epub/epub"),
             Path("src/manga_pdf_to_epub/gui"),
             Path("src/manga_pdf_to_epub/models"),
@@ -73,6 +75,12 @@ class ProjectGuardrailTests(unittest.TestCase):
                     references.append(str(path))
 
         self.assertEqual([], references)
+
+    def test_project_exposes_generic_source_converter_command(self):
+        pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+
+        self.assertIn('manga-to-epub = "manga_pdf_to_epub.cli.pdf_to_epub_lossless:main"', pyproject)
+        self.assertIn('pdf-to-epub-lossless = "manga_pdf_to_epub.cli.pdf_to_epub_lossless:main"', pyproject)
 
 
 if __name__ == "__main__":

@@ -113,6 +113,12 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
 
         self.assertIn("Open Diagnose Window", commands)
 
+    def test_command_palette_uses_source_label_for_open_action(self):
+        commands = [command.label for command in EpubLayoutApp._commands()]
+
+        self.assertIn("Open Source", commands)
+        self.assertNotIn("Open PDF", commands)
+
     def test_command_palette_finds_diagnose_window_by_diagnosis_keyword(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
 

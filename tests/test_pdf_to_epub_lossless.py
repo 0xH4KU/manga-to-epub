@@ -2,6 +2,7 @@ import io
 import json
 import tempfile
 import unittest
+import warnings
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
@@ -561,8 +562,10 @@ class PdfToEpubLosslessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             epub_path = Path(tmp) / "broken.epub"
             with ZipFile(epub_path, "w") as archive:
-                archive.writestr("mimetype", b"application/epub+zip")
-                archive.writestr("mimetype", b"application/epub+zip")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UserWarning)
+                    archive.writestr("mimetype", b"application/epub+zip")
+                    archive.writestr("mimetype", b"application/epub+zip")
 
             with self.assertRaisesRegex(PdfImageError, "Duplicate EPUB zip entry: mimetype"):
                 _validate_epub_structure(epub_path)

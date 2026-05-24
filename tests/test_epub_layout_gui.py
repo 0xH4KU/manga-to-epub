@@ -359,7 +359,7 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
         self.assertEqual(
             [
                 "Import Series...",
-                "Open PDF",
+                "Open Source",
                 "Export EPUB",
                 "Export Ready Series...",
                 "Open Project...",

@@ -5,13 +5,32 @@ from io import BytesIO
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Callable
-from zipfile import BadZipFile, ZipFile
+from zipfile import BadZipFile, ZipFile, ZipInfo
 
 from ..pdf.image_types import PdfImageError
 
 
-_DIRECT_IMAGE_EXTS = {"jpg", "jpeg", "png"}
-_CONVERTED_IMAGE_EXTS = {"webp", "bmp", "tif", "tiff", "gif"}
+_JPEG_IMAGE_EXTS = {"jpg", "jpeg", "jpe", "jfif"}
+_PNG_IMAGE_EXTS = {"png", "apng"}
+_DIRECT_IMAGE_EXTS = _JPEG_IMAGE_EXTS | _PNG_IMAGE_EXTS
+_CONVERTED_IMAGE_EXTS = {
+    "webp",
+    "bmp",
+    "tif",
+    "tiff",
+    "gif",
+    "avif",
+    "avifs",
+    "jp2",
+    "j2k",
+    "j2c",
+    "jpc",
+    "jpf",
+    "jpx",
+    "heic",
+    "heif",
+    "hif",
+}
 _SUPPORTED_IMAGE_EXTS = _DIRECT_IMAGE_EXTS | _CONVERTED_IMAGE_EXTS
 
 
@@ -34,6 +53,12 @@ class ArchiveImage:
         raise PdfImageError(f"Archive image {self.label} has no payload data")
 
 
+@dataclass(frozen=True)
+class _ArchiveMember:
+    info: ZipInfo
+    path: PurePosixPath
+
+
 def archive_images_in_page_order(archive_path: Path, load_payloads: bool = True) -> list[ArchiveImage]:
     archive_path = Path(archive_path)
     if archive_path.suffix.lower() not in {".cbz", ".zip"}:
@@ -41,7 +66,7 @@ def archive_images_in_page_order(archive_path: Path, load_payloads: bool = True)
 
     try:
         with ZipFile(archive_path) as archive:
-            members = sorted(_image_member_names(archive), key=_natural_archive_key)
+            members = sorted(_image_members(archive), key=lambda member: _natural_archive_key(member.path.as_posix()))
     except BadZipFile as exc:
         raise PdfImageError(f"Cannot read archive source: {archive_path}") from exc
 
@@ -54,17 +79,21 @@ def archive_images_in_page_order(archive_path: Path, load_payloads: bool = True)
     return images
 
 
-def _image_member_names(archive: ZipFile) -> list[str]:
-    names: list[str] = []
+def _image_members(archive: ZipFile) -> list[_ArchiveMember]:
+    members: list[_ArchiveMember] = []
     for info in archive.infolist():
         if info.is_dir():
             continue
-        path = PurePosixPath(info.filename)
+        path = _archive_member_path(info.filename)
         if _is_junk_path(path):
             continue
         if _source_ext(path.name) in _SUPPORTED_IMAGE_EXTS:
-            names.append(info.filename)
-    return names
+            members.append(_ArchiveMember(info=info, path=path))
+    return members
+
+
+def _archive_member_path(member_name: str) -> PurePosixPath:
+    return PurePosixPath(member_name.replace("\\", "/"))
 
 
 def _is_junk_path(path: PurePosixPath) -> bool:
@@ -74,17 +103,17 @@ def _is_junk_path(path: PurePosixPath) -> bool:
     return path.name.startswith(".") or path.name.startswith("._")
 
 
-def _archive_image(archive_path: Path, member_name: str, index: int, load_payloads: bool) -> ArchiveImage:
-    ext = _source_ext(member_name)
-    label = PurePosixPath(member_name).stem
+def _archive_image(archive_path: Path, member: _ArchiveMember, index: int, load_payloads: bool) -> ArchiveImage:
+    ext = _source_ext(member.path.name)
+    label = member.path.stem
     if ext in _DIRECT_IMAGE_EXTS:
-        payload = _payload_or_loader(load_payloads, lambda: _read_member(archive_path, member_name))
-        width, height = _image_dimensions(_read_member(archive_path, member_name))
-        epub_ext = "jpg" if ext == "jpeg" else ext
+        payload = _payload_or_loader(load_payloads, lambda: _read_member(archive_path, member.info))
+        width, height = _image_dimensions(_read_member(archive_path, member.info))
+        epub_ext = "jpg" if ext in _JPEG_IMAGE_EXTS else "png"
     else:
-        raw = _read_member(archive_path, member_name)
+        raw = _read_member(archive_path, member.info)
         width, height = _image_dimensions(raw)
-        payload = _payload_or_loader(load_payloads, lambda: _image_bytes_to_png(raw, member_name))
+        payload = _payload_or_loader(load_payloads, lambda: _image_bytes_to_png(raw, member.path.as_posix()))
         epub_ext = "png"
     return ArchiveImage(
         index=index,
@@ -107,19 +136,19 @@ def _payload_or_loader(
     return None, load_data
 
 
-def _read_member(archive_path: Path, member_name: str) -> bytes:
+def _read_member(archive_path: Path, member_info: ZipInfo) -> bytes:
     try:
         with ZipFile(archive_path) as archive:
-            return archive.read(member_name)
+            return archive.read(member_info)
     except BadZipFile as exc:
         raise PdfImageError(f"Cannot read archive source: {archive_path}") from exc
     except KeyError as exc:
-        raise PdfImageError(f"Archive member missing: {member_name}") from exc
+        raise PdfImageError(f"Archive member missing: {member_info.filename}") from exc
 
 
 def _image_dimensions(payload: bytes) -> tuple[int, int]:
     try:
-        from PIL import Image
+        Image = _pillow_image_module()
 
         with Image.open(BytesIO(payload)) as image:
             return int(image.width), int(image.height)
@@ -131,7 +160,7 @@ def _image_dimensions(payload: bytes) -> tuple[int, int]:
 
 def _image_bytes_to_png(payload: bytes, member_name: str) -> bytes:
     try:
-        from PIL import Image
+        Image = _pillow_image_module()
 
         with Image.open(BytesIO(payload)) as image:
             frame = image.copy()
@@ -146,10 +175,21 @@ def _image_bytes_to_png(payload: bytes, member_name: str) -> bytes:
         raise PdfImageError(f"Cannot convert archive image to PNG: {member_name}") from exc
 
 
+def _pillow_image_module():
+    from PIL import Image
+
+    try:
+        import pillow_heif
+
+        pillow_heif.register_heif_opener()
+    except ImportError:
+        pass
+    return Image
+
+
 def _natural_archive_key(member_name: str) -> list[int | str]:
     return [int(part) if part.isdigit() else part.casefold() for part in re.split(r"(\d+)", member_name)]
 
 
 def _source_ext(name: str) -> str:
     return PurePosixPath(name).suffix.lower().lstrip(".")
-

@@ -1,1 +1,1 @@
-"""Lossless manga PDF to EPUB conversion tools."""
+"""Lossless manga source to EPUB conversion tools."""
