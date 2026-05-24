@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from tkinter import messagebox, ttk
 from typing import Callable
 
-from .epub_layout_diagnosis import DiagnosisSession, InsertClassification, SpreadDamage
-from .epub_layout_diagnosis_runner import DiagnosisSettings
+from .layout_diagnosis import DiagnosisSession, InsertClassification, SpreadDamage
+from .layout_diagnosis_runner import DiagnosisSettings
 
 
 @dataclass(frozen=True)

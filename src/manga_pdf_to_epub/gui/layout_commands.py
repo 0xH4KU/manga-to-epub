@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .epub_layout_gui_support import AppCommand
+from .layout_support import AppCommand
 
 
 def app_commands() -> tuple[AppCommand, ...]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any
 
-from .epub_layout_gui_support import VirtualBlank
+from .layout_support import VirtualBlank
 
 
 class ThumbnailCache(OrderedDict):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 
-from .pdf_to_cbz_lossless import PdfImageError
+from .pdf.image_types import PdfImageError
 
 
 def load_fitz():

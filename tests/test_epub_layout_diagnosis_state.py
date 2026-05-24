@@ -1,6 +1,6 @@
 import unittest
 
-from manga_pdf_to_epub.epub_layout_diagnosis import (
+from manga_pdf_to_epub.gui.layout_diagnosis import (
     DiagnosisSession,
     SpreadCandidate,
     adjacent_pair_id,

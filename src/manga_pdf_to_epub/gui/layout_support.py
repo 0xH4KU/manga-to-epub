@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .epub_layout_model import LayoutEntry
+from ..models.layout import LayoutEntry
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from manga_pdf_to_epub.epub_layout_gui import EpubLayoutApp
+from manga_pdf_to_epub.gui.layout_app import EpubLayoutApp
 
 
 class FakeBool:

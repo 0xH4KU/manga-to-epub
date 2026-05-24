@@ -5,10 +5,11 @@ import mimetypes
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
-from .epub_validation import validate_epub_structure
-from .pdf_to_cbz_lossless import PdfImageError
+from .validation import validate_epub_structure
+from ..pdf.image_types import PdfImageError
 
 
 @dataclass(frozen=True)
@@ -22,7 +23,15 @@ class EpubPage:
     xhtml_href: str
     item_id: str
     label: str
+    image_data_loader: Callable[[], bytes] | None = None
     is_blank: bool = False
+
+    def load_image_data(self) -> bytes:
+        if self.image_data is not None:
+            return self.image_data
+        if self.image_data_loader is not None:
+            return self.image_data_loader()
+        raise PdfImageError(f"Page {self.label} has no image payload")
 
 
 def media_type_for_ext(ext: str) -> str:
@@ -85,7 +94,7 @@ def write_epub_from_pages(
                 _write_deflated(archive, f"EPUB/{page.xhtml_href}", _page_xhtml(title, page, language))
         for page in pages:
             if not page.is_blank:
-                _write_stored(archive, f"EPUB/{page.image_href}", page.image_data)
+                _write_stored(archive, f"EPUB/{page.image_href}", page.load_image_data())
 
     validate_epub_structure(epub_path)
     result = dict(counts or {})

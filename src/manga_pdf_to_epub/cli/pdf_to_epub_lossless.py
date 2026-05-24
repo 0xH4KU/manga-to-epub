@@ -6,12 +6,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .epub_layout_model import LayoutModel
-from .epub_naming import generated_volume_title, infer_volume_number
-from .epub_page_factory import page_from_image
-from .epub_validation import validate_epub_structure
-from .epub_writer import EpubPage, media_type_for_ext, write_epub_from_pages
-from .pdf_to_cbz_lossless import ImageStream, PdfImageError, images_in_pdf_page_order
+from ..models.layout import LayoutModel
+from ..epub.naming import generated_volume_title, infer_volume_number
+from ..pdf.image_extraction import images_in_pdf_page_order
+from ..pdf.image_types import ImageStream, PdfImageError
+from ..epub.page_factory import page_from_image
+from ..epub.validation import validate_epub_structure
+from ..epub.writer import EpubPage, media_type_for_ext, write_epub_from_pages
 
 
 _validate_epub_structure = validate_epub_structure
@@ -35,7 +36,7 @@ def convert_pdf_to_epub(
     if epub_path.exists() and not overwrite:
         raise PdfImageError(f"Refusing to overwrite existing file: {epub_path}")
 
-    images = images_in_pdf_page_order(pdf_path)
+    images = images_in_pdf_page_order(pdf_path, load_payloads=False)
     if not images:
         raise PdfImageError(f"No image streams found in {pdf_path}")
 
@@ -74,7 +75,7 @@ def _build_pages(
             for blank_index in range(1, blank_pages_before_cover + 1):
                 counts["blank"] = counts.get("blank", 0) + 1
                 pages.append(_blank_page(image, blank_index, "before"))
-        page, ext = page_from_image(image, padding)
+        page, ext = page_from_image(image, padding, load_payload=False)
         counts[ext] = counts.get(ext, 0) + 1
         pages.append(page)
         if image.index == 1:

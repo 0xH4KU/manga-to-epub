@@ -1,6 +1,6 @@
 # Manga PDF to EPUB
 
-Lossless PDF to EPUB/CBZ tools for manga readers who care about page pairing, cover gaps, and Apple Books layout quirks.
+Lossless PDF to EPUB tools for manga readers who care about page pairing, cover gaps, and Apple Books layout quirks.
 
 This project is not a general-purpose "compress my PDF" converter. It is for fixed-layout manga workflows where the source PDF already contains page images, and the goal is to preserve those images while tuning the reading order for Apple Books.
 
@@ -29,7 +29,6 @@ This tool focuses on the boring-but-crucial details:
 
 - PDF to EPUB without image recompression for JPEG image streams.
 - PDF Flate image streams are wrapped into PNG containers.
-- PDF to CBZ export with page-tree order preservation.
 - Tkinter GUI for manual manga layout tuning.
 - Preview-only Apple Books cover-gap mode with a virtual blank page on the right of the first spine item.
 - Arbitrary blank page insertion before or after selected pages.
@@ -55,6 +54,7 @@ The equivalent manual setup is:
 python3 -m venv .venv
 .venv/bin/python -m pip install -U pip
 .venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -e .
 ```
 
 ## GUI Workflow
@@ -62,7 +62,7 @@ python3 -m venv .venv
 Launch the layout editor:
 
 ```bash
-.venv/bin/python epub_layout_gui.py
+.venv/bin/epub-layout-gui
 ```
 
 Typical single-volume Apple Books manga workflow:
@@ -139,13 +139,13 @@ Version 1 presets from earlier builds still load. When a v2 preset references an
 Convert PDF files to fixed-layout EPUB:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" --overwrite
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" --overwrite
 ```
 
 Insert one real blank page before the cover:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
   --blank-pages-before-cover 1 \
   --overwrite
 ```
@@ -153,7 +153,7 @@ Insert one real blank page before the cover:
 Export multiple PDFs into a directory:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py *.pdf \
+.venv/bin/pdf-to-epub-lossless *.pdf \
   --output-dir ./epub-output \
   --overwrite
 ```
@@ -161,7 +161,7 @@ Export multiple PDFs into a directory:
 Set EPUB metadata and use source page 2 as cover art only:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
   --title "Series Vol.01" \
   --author "Author Name" \
   --language ja \
@@ -173,7 +173,7 @@ Set EPUB metadata and use source page 2 as cover art only:
 Apply a GUI layout preset or quick-delete pages without opening the GUI:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
   --preset ./layout-preset.json \
   --delete-range 1-3 \
   --overwrite
@@ -182,7 +182,7 @@ Apply a GUI layout preset or quick-delete pages without opening the GUI:
 Inserted images use `POSITION=PATH` with 1-based spine positions:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
   --insert-image-after 1=./cover.png \
   --overwrite
 ```
@@ -190,19 +190,13 @@ Inserted images use `POSITION=PATH` with 1-based spine positions:
 For series-style generated titles, use `--series-title` with either `--volume-number` or a filename that contains a volume number:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 07.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 07.pdf" \
   --series-title "Series Title" \
   --volume-number 7 \
   --overwrite
 ```
 
 For OPF spread metadata, `--pair-first-two-pages` explicitly marks the first two source pages as a right-to-left spread pair. `--apple-books` instead writes centered single-page spread metadata for every reading page; these modes are mutually exclusive.
-
-Export CBZ:
-
-```bash
-.venv/bin/python pdf_to_cbz_lossless.py "Volume 01.pdf" --overwrite
-```
 
 ## Apple Books Notes
 
@@ -218,16 +212,19 @@ The OPF modified timestamp is intentionally deterministic so repeated exports ar
 
 ## Lossless Scope
 
-The converter avoids recompressing source artwork where the PDF stores JPEG image streams. Those JPEG bytes are copied directly into the EPUB/CBZ.
+The converter avoids recompressing source artwork where the PDF stores JPEG image streams. Those JPEG bytes are copied directly into the EPUB.
 
 For Flate-compressed PDF image streams, the tool wraps the image data into PNG. If the PDF uses PNG-style predictors, the compressed rows can be reused inside the PNG container. Unsupported PDF color spaces or filter chains raise an error instead of silently degrading output.
 
 ## Project Files
 
-- `src/manga_pdf_to_epub/` - installable Python package with the converters, models, writer, validation, and GUI implementation.
-- `pdf_to_epub_lossless.py`, `pdf_to_cbz_lossless.py`, `epub_layout_gui.py` - compatibility wrappers for direct script usage from the repo root.
-- `src/manga_pdf_to_epub/epub_layout_series_workflow.py` - GUI-facing series export preflight helpers.
-- `src/manga_pdf_to_epub/epub_batch_model.py` - deprecated legacy batch project queue retained for tests and migration only; use `SeriesProject` for new workflow work.
+- `src/manga_pdf_to_epub/` - installable package grouped into `pdf/`, `epub/`, `models/`, `gui/`, and `cli/` subpackages.
+- `src/manga_pdf_to_epub/pdf/` - PDF image discovery, object parsing, image stream types, and PNG wrapping.
+- `src/manga_pdf_to_epub/epub/` - EPUB page construction, writing, naming, and validation.
+- `src/manga_pdf_to_epub/models/` - layout, series, and deprecated batch project models.
+- `src/manga_pdf_to_epub/gui/` - Tkinter layout editor, diagnosis window, preview helpers, and series GUI workflow.
+- `src/manga_pdf_to_epub/cli/` - command-line entrypoints.
+- `scripts/` - compatibility wrappers for direct script usage during development; installed commands live in `.venv/bin/` after setup.
 - `tests/` - unit tests for conversion, layout, series workflows, GUI behavior, and project guardrails.
 
 ## Test

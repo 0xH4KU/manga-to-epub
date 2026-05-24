@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from .epub_naming import safe_filename
-from .epub_series_model import SeriesProject
+from ..epub.naming import safe_filename
+from ..models.series import SeriesProject
 
 
 @dataclass(frozen=True)

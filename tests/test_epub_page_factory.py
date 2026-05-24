@@ -1,7 +1,7 @@
 import unittest
 
-from manga_pdf_to_epub.epub_page_factory import page_from_image
-from manga_pdf_to_epub.pdf_to_cbz_lossless import ImageStream
+from manga_pdf_to_epub.epub.page_factory import page_from_image
+from manga_pdf_to_epub.pdf.image_types import ImageStream
 
 
 class EpubPageFactoryTests(unittest.TestCase):

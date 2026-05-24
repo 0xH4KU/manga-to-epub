@@ -7,7 +7,7 @@ from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 from xml.etree import ElementTree
 
-from .pdf_to_cbz_lossless import PdfImageError
+from ..pdf.image_types import PdfImageError
 
 
 def validate_epub_structure(epub_path: Path) -> None:
