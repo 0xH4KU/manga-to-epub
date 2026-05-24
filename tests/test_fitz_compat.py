@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from manga_pdf_to_epub import fitz_compat
-from manga_pdf_to_epub.pdf_to_cbz_lossless import PdfImageError
+from manga_pdf_to_epub.pdf_image_types import PdfImageError
 
 
 class FitzCompatTests(unittest.TestCase):

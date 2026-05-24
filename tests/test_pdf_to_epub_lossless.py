@@ -7,7 +7,7 @@ from zipfile import ZIP_STORED, ZipFile
 from contextlib import redirect_stderr
 from unittest.mock import patch
 
-from manga_pdf_to_epub.pdf_to_cbz_lossless import PdfImageError
+from manga_pdf_to_epub.pdf_image_types import PdfImageError
 from manga_pdf_to_epub.pdf_to_epub_lossless import (
     EpubPage,
     _media_type_for_ext,

@@ -30,6 +30,27 @@ class ProjectGuardrailTests(unittest.TestCase):
             lines = path.read_text(encoding="utf-8").splitlines()
             self.assertLessEqual(len(lines), 550, str(path))
 
+    def test_cbz_export_files_are_removed(self):
+        removed_paths = [
+            Path("pdf_to_cbz_lossless.py"),
+            Path("src/manga_pdf_to_epub/pdf_to_cbz_lossless.py"),
+            Path("tests/test_pdf_to_cbz_lossless.py"),
+        ]
+
+        self.assertEqual([], [str(path) for path in removed_paths if path.exists()])
+
+    def test_runtime_code_does_not_import_cbz_module(self):
+        references = []
+        for directory in (Path("src"), Path("tests")):
+            for path in directory.rglob("*.py"):
+                if path == Path("tests/test_project_guardrails.py"):
+                    continue
+                source = path.read_text(encoding="utf-8")
+                if "pdf_to_cbz_lossless" in source:
+                    references.append(str(path))
+
+        self.assertEqual([], references)
+
 
 if __name__ == "__main__":
     unittest.main()

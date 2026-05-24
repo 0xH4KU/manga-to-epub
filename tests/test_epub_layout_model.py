@@ -5,7 +5,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from manga_pdf_to_epub.epub_layout_model import LayoutModel
-from manga_pdf_to_epub.pdf_to_cbz_lossless import PdfImageError
+from manga_pdf_to_epub.pdf_image_types import PdfImageError
 from tests.helpers import four_page_pdf, one_page_pdf, tiny_png, two_page_pdf_with_late_cover
 
 

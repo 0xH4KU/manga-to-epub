@@ -8,10 +8,11 @@ from pathlib import Path
 
 from .epub_layout_model import LayoutModel
 from .epub_naming import generated_volume_title, infer_volume_number
+from .pdf_image_extraction import images_in_pdf_page_order
+from .pdf_image_types import ImageStream, PdfImageError
 from .epub_page_factory import page_from_image
 from .epub_validation import validate_epub_structure
 from .epub_writer import EpubPage, media_type_for_ext, write_epub_from_pages
-from .pdf_to_cbz_lossless import ImageStream, PdfImageError, images_in_pdf_page_order
 
 
 _validate_epub_structure = validate_epub_structure

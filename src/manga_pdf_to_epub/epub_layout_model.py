@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .fitz_compat import load_fitz
-from .pdf_to_cbz_lossless import ImageStream, PdfImageError, images_in_pdf_page_order
+from .pdf_image_extraction import images_in_pdf_page_order
+from .pdf_image_types import ImageStream, PdfImageError
 from .epub_page_factory import page_from_image
 from .epub_writer import EpubPage, media_type_for_ext, write_epub_from_pages
 

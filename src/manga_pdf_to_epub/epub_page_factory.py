@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from .epub_writer import EpubPage, media_type_for_ext
-from .pdf_to_cbz_lossless import ImageStream, image_to_archive_member
+from .pdf_image_types import ImageStream
+from .pdf_png import image_to_epub_member
 
 
 def page_from_image(image: ImageStream, padding: int) -> tuple[EpubPage, str]:
-    ext, payload = image_to_archive_member(image)
+    ext, payload = image_to_epub_member(image)
     page_number = f"{image.index:0{padding}d}"
     return (
         EpubPage(

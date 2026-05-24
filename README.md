@@ -1,6 +1,6 @@
 # Manga PDF to EPUB
 
-Lossless PDF to EPUB/CBZ tools for manga readers who care about page pairing, cover gaps, and Apple Books layout quirks.
+Lossless PDF to EPUB tools for manga readers who care about page pairing, cover gaps, and Apple Books layout quirks.
 
 This project is not a general-purpose "compress my PDF" converter. It is for fixed-layout manga workflows where the source PDF already contains page images, and the goal is to preserve those images while tuning the reading order for Apple Books.
 
@@ -29,7 +29,6 @@ This tool focuses on the boring-but-crucial details:
 
 - PDF to EPUB without image recompression for JPEG image streams.
 - PDF Flate image streams are wrapped into PNG containers.
-- PDF to CBZ export with page-tree order preservation.
 - Tkinter GUI for manual manga layout tuning.
 - Preview-only Apple Books cover-gap mode with a virtual blank page on the right of the first spine item.
 - Arbitrary blank page insertion before or after selected pages.
@@ -198,12 +197,6 @@ For series-style generated titles, use `--series-title` with either `--volume-nu
 
 For OPF spread metadata, `--pair-first-two-pages` explicitly marks the first two source pages as a right-to-left spread pair. `--apple-books` instead writes centered single-page spread metadata for every reading page; these modes are mutually exclusive.
 
-Export CBZ:
-
-```bash
-.venv/bin/python pdf_to_cbz_lossless.py "Volume 01.pdf" --overwrite
-```
-
 ## Apple Books Notes
 
 The GUI preview deliberately models Apple Books' cover behavior by adding a virtual blank page on the right of the first spine item. This virtual page is not exported into the EPUB. It is only a preview aid so you can decide whether to insert a real blank page into the EPUB spine.
@@ -218,14 +211,14 @@ The OPF modified timestamp is intentionally deterministic so repeated exports ar
 
 ## Lossless Scope
 
-The converter avoids recompressing source artwork where the PDF stores JPEG image streams. Those JPEG bytes are copied directly into the EPUB/CBZ.
+The converter avoids recompressing source artwork where the PDF stores JPEG image streams. Those JPEG bytes are copied directly into the EPUB.
 
 For Flate-compressed PDF image streams, the tool wraps the image data into PNG. If the PDF uses PNG-style predictors, the compressed rows can be reused inside the PNG container. Unsupported PDF color spaces or filter chains raise an error instead of silently degrading output.
 
 ## Project Files
 
-- `src/manga_pdf_to_epub/` - installable Python package with the converters, models, writer, validation, and GUI implementation.
-- `pdf_to_epub_lossless.py`, `pdf_to_cbz_lossless.py`, `epub_layout_gui.py` - compatibility wrappers for direct script usage from the repo root.
+- `src/manga_pdf_to_epub/` - installable Python package with the converter, PDF image extraction, models, writer, validation, and GUI implementation.
+- `pdf_to_epub_lossless.py`, `epub_layout_gui.py` - compatibility wrappers for direct script usage from the repo root.
 - `src/manga_pdf_to_epub/epub_layout_series_workflow.py` - GUI-facing series export preflight helpers.
 - `src/manga_pdf_to_epub/epub_batch_model.py` - deprecated legacy batch project queue retained for tests and migration only; use `SeriesProject` for new workflow work.
 - `tests/` - unit tests for conversion, layout, series workflows, GUI behavior, and project guardrails.
