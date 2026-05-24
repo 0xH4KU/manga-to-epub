@@ -11,9 +11,9 @@ from .pdf_object_parser import decode_pdf_literal_string, extract_int
 
 def image_to_epub_member(image: ImageStream) -> tuple[str, bytes]:
     if image.filter_name == "PNG":
-        return "png", image.data
+        return "png", image.load_data()
     if image.filter_name == "DCTDecode":
-        return "jpg", image.data
+        return "jpg", image.load_data()
     if image.filter_name == "FlateDecode":
         return "png", flate_image_to_png(image)
     raise PdfImageError(f"Unsupported image filter: {image.filter_name}")
@@ -32,9 +32,9 @@ def flate_image_to_png(image: ImageStream) -> bytes:
 
     color_type, palette = _png_color(image.color_space, bpc)
     if 10 <= predictor <= 15:
-        return make_png_from_compressed_rows(image.width, image.height, bpc, color_type, image.data, palette)
+        return make_png_from_compressed_rows(image.width, image.height, bpc, color_type, image.load_data(), palette)
 
-    raw = zlib.decompress(image.data)
+    raw = zlib.decompress(image.load_data())
     scanlines = _undo_predictor(raw, predictor, columns, colors, bpc, image.height)
     return make_png_from_scanlines(image.width, image.height, bpc, color_type, scanlines, palette)
 

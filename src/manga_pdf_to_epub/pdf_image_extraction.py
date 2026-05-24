@@ -3,24 +3,25 @@ from __future__ import annotations
 import importlib
 import re
 from pathlib import Path
+from typing import Callable
 
 from .pdf_image_types import ImageStream, PdfImageError
 
 
-def images_in_pdf_page_order(pdf_path: Path) -> list[ImageStream]:
+def images_in_pdf_page_order(pdf_path: Path, load_payloads: bool = True) -> list[ImageStream]:
     fitz = _load_fitz()
     if fitz is None:
         raise PdfImageError("PyMuPDF is required for PDF page-order image extraction. Install PyMuPDF and try again.")
 
-    doc = fitz.open(pdf_path)
-    images: list[ImageStream] = []
-    for page in doc:
-        page_images = page.get_images(full=True)
-        for page_image in page_images:
-            xref = page_image[0]
-            image = _image_from_xref(doc, xref, len(images) + 1)
-            if image is not None:
-                images.append(image)
+    with fitz.open(pdf_path) as doc:
+        images: list[ImageStream] = []
+        for page in doc:
+            page_images = page.get_images(full=True)
+            for page_image in page_images:
+                xref = page_image[0]
+                image = _image_from_xref(doc, xref, len(images) + 1, load_payloads=load_payloads, pdf_path=pdf_path)
+                if image is not None:
+                    images.append(image)
 
     return images
 
@@ -32,7 +33,13 @@ def _load_fitz():
         return None
 
 
-def _image_from_xref(doc, xref: int, index: int) -> ImageStream | None:
+def _image_from_xref(
+    doc,
+    xref: int,
+    index: int,
+    load_payloads: bool = True,
+    pdf_path: Path | None = None,
+) -> ImageStream | None:
     subtype = doc.xref_get_key(xref, "Subtype")
     if subtype[1] != "/Image":
         return None
@@ -46,6 +53,11 @@ def _image_from_xref(doc, xref: int, index: int) -> ImageStream | None:
         if ext == "jpeg":
             filter_name = "DCTDecode"
         elif ext == "png":
+            payload = _payload_or_loader(
+                load_payloads,
+                lambda: extracted["image"],
+                _lazy_extracted_image_loader(pdf_path, xref),
+            )
             return ImageStream(
                 index=index,
                 width=extracted["width"],
@@ -54,13 +66,15 @@ def _image_from_xref(doc, xref: int, index: int) -> ImageStream | None:
                 color_space=b"/DeviceRGB",
                 filter_name="PNG",
                 decode_parms=None,
-                data=extracted["image"],
+                data=payload[0],
                 xref=xref,
+                data_loader=payload[1],
             )
         else:
             raise PdfImageError(f"Unsupported extracted image extension for xref {xref}: {ext}")
 
     if filter_name == "DCTDecode":
+        payload = _payload_or_loader(load_payloads, lambda: doc.xref_stream_raw(xref), _lazy_raw_stream_loader(pdf_path, xref))
         return ImageStream(
             index=index,
             width=_xref_required_int(doc, xref, "Width"),
@@ -69,11 +83,13 @@ def _image_from_xref(doc, xref: int, index: int) -> ImageStream | None:
             color_space=_xref_object(doc, xref, "ColorSpace"),
             filter_name=filter_name,
             decode_parms=_xref_object(doc, xref, "DecodeParms"),
-            data=doc.xref_stream_raw(xref),
+            data=payload[0],
             xref=xref,
+            data_loader=payload[1],
         )
 
     if filter_name == "FlateDecode":
+        payload = _payload_or_loader(load_payloads, lambda: doc.xref_stream_raw(xref), _lazy_raw_stream_loader(pdf_path, xref))
         return ImageStream(
             index=index,
             width=_xref_required_int(doc, xref, "Width"),
@@ -82,21 +98,29 @@ def _image_from_xref(doc, xref: int, index: int) -> ImageStream | None:
             color_space=_normalize_xref_color_space(doc, _xref_object(doc, xref, "ColorSpace")),
             filter_name=filter_name,
             decode_parms=_normalize_pdf_object(_xref_object(doc, xref, "DecodeParms")),
-            data=doc.xref_stream_raw(xref),
+            data=payload[0],
             xref=xref,
+            data_loader=payload[1],
         )
 
     if filter_name in {"JBIG2Decode"}:
-        return _decoded_image_from_xref(doc, xref, index)
+        return _decoded_image_from_xref(doc, xref, index, load_payloads=load_payloads, pdf_path=pdf_path)
 
     raise PdfImageError(f"Unsupported image filter for xref {xref}: {filter_name}")
 
 
-def _decoded_image_from_xref(doc, xref: int, index: int) -> ImageStream:
+def _decoded_image_from_xref(
+    doc,
+    xref: int,
+    index: int,
+    load_payloads: bool = True,
+    pdf_path: Path | None = None,
+) -> ImageStream:
     extracted = doc.extract_image(xref)
     ext = extracted["ext"]
     if ext != "png":
         raise PdfImageError(f"Unsupported extracted image extension for xref {xref}: {ext}")
+    payload = _payload_or_loader(load_payloads, lambda: extracted["image"], _lazy_extracted_image_loader(pdf_path, xref))
     return ImageStream(
         index=index,
         width=extracted["width"],
@@ -105,9 +129,48 @@ def _decoded_image_from_xref(doc, xref: int, index: int) -> ImageStream:
         color_space=b"/DeviceRGB",
         filter_name="PNG",
         decode_parms=None,
-        data=extracted["image"],
+        data=payload[0],
         xref=xref,
+        data_loader=payload[1],
     )
+
+
+def _payload_or_loader(
+    load_payloads: bool,
+    load_data: Callable[[], bytes],
+    loader: Callable[[], bytes] | None,
+) -> tuple[bytes | None, Callable[[], bytes] | None]:
+    if load_payloads or loader is None:
+        return load_data(), None
+    return None, loader
+
+
+def _lazy_raw_stream_loader(pdf_path: Path | None, xref: int) -> Callable[[], bytes] | None:
+    if pdf_path is None:
+        return None
+
+    def load() -> bytes:
+        fitz = _load_fitz()
+        if fitz is None:
+            raise PdfImageError("PyMuPDF is required for PDF image extraction. Install PyMuPDF and try again.")
+        with fitz.open(pdf_path) as doc:
+            return doc.xref_stream_raw(xref)
+
+    return load
+
+
+def _lazy_extracted_image_loader(pdf_path: Path | None, xref: int) -> Callable[[], bytes] | None:
+    if pdf_path is None:
+        return None
+
+    def load() -> bytes:
+        fitz = _load_fitz()
+        if fitz is None:
+            raise PdfImageError("PyMuPDF is required for PDF image extraction. Install PyMuPDF and try again.")
+        with fitz.open(pdf_path) as doc:
+            return doc.extract_image(xref)["image"]
+
+    return load
 
 
 def _xref_required_int(doc, xref: int, key: str) -> int:

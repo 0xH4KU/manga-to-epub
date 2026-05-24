@@ -264,9 +264,70 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         self.assertIs(first, second)
         photo.assert_called_once()
 
+    def test_thumbnail_for_page_schedules_uncached_pdf_render(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.pdf_path = Path("/tmp/book.pdf")
+        app.thumbnail_cache = {}
+        app._thumbnail_render_jobs = set()
+        app._start_thumbnail_render = lambda page_index, max_w, max_h, cache_key: setattr(
+            app, "render_request", (page_index, max_w, max_h, cache_key)
+        )
+
+        thumbnail = app._thumbnail_for_page(3, 120, 180)
+
+        self.assertIsNone(thumbnail)
+        self.assertEqual((3, 120, 180, ("pdf", 3, 150, 200)), app.render_request)
+
+    def test_thumbnail_render_done_caches_image_and_refreshes_current_pdf(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.pdf_path = Path("/tmp/book.pdf")
+        app.thumbnail_cache = {}
+        app._thumbnail_render_jobs = {("pdf", 1, 100, 150)}
+        app._thumbnail_cache_generation = 2
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+        photo_image = object()
+
+        with patch("manga_pdf_to_epub.epub_layout_gui.tk.PhotoImage", return_value=photo_image) as photo:
+            app._thumbnail_render_done(("pdf", 1, 100, 150), Path("/tmp/book.pdf"), 2, b"PNG", None)
+
+        photo.assert_called_once_with(data=b"PNG")
+        self.assertEqual(photo_image, app.thumbnail_cache[("pdf", 1, 100, 150)])
+        self.assertEqual(set(), app._thumbnail_render_jobs)
+        self.assertTrue(app.preview_refreshed)
+
+    def test_thumbnail_render_done_ignores_stale_pdf_results(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.pdf_path = Path("/tmp/new.pdf")
+        app.thumbnail_cache = {}
+        app._thumbnail_render_jobs = {("pdf", 1, 100, 150)}
+        app._thumbnail_cache_generation = 2
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        app._thumbnail_render_done(("pdf", 1, 100, 150), Path("/tmp/old.pdf"), 2, b"PNG", None)
+
+        self.assertEqual({}, app.thumbnail_cache)
+        self.assertEqual(set(), app._thumbnail_render_jobs)
+        self.assertFalse(hasattr(app, "preview_refreshed"))
+
+    def test_thumbnail_render_done_ignores_stale_cache_generation(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.pdf_path = Path("/tmp/book.pdf")
+        app.thumbnail_cache = {}
+        app._thumbnail_render_jobs = {("pdf", 1, 100, 150)}
+        app._thumbnail_cache_generation = 3
+        app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+
+        app._thumbnail_render_done(("pdf", 1, 100, 150), Path("/tmp/book.pdf"), 2, b"PNG", None)
+
+        self.assertEqual({}, app.thumbnail_cache)
+        self.assertEqual(set(), app._thumbnail_render_jobs)
+        self.assertFalse(hasattr(app, "preview_refreshed"))
+
     def test_reset_preview_cache_closes_open_document_and_clears_thumbnails(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.thumbnail_cache = {"old": object()}
+        app._thumbnail_render_jobs = {("pdf", 1, 100, 150)}
+        app._thumbnail_cache_generation = 1
         app._pdf_doc_path = Path("/tmp/book.pdf")
         app.closed = False
         app._pdf_doc = SimpleNamespace(close=lambda: setattr(app, "closed", True))
@@ -274,6 +335,8 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app._reset_preview_cache()
 
         self.assertEqual({}, app.thumbnail_cache)
+        self.assertEqual(set(), app._thumbnail_render_jobs)
+        self.assertEqual(2, app._thumbnail_cache_generation)
         self.assertIsNone(app._pdf_doc)
         self.assertIsNone(app._pdf_doc_path)
         self.assertTrue(app.closed)

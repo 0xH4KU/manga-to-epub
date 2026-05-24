@@ -43,6 +43,21 @@ class PdfToEpubLosslessTests(unittest.TestCase):
                 self.assertIn('properties="cover-image"', opf)
                 self.assertIn('href="images/page-0001.jpg"', opf)
 
+    def test_direct_conversion_builds_pages_with_lazy_pdf_payloads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            epub_path = Path(tmp) / "comic.epub"
+            pdf_path.write_bytes(two_page_pdf_with_late_cover())
+
+            with patch("manga_pdf_to_epub.pdf_to_epub_lossless.write_epub_from_pages") as write_epub:
+                write_epub.return_value = {"jpg": 2, "png": 0, "total": 2}
+
+                convert_pdf_to_epub(pdf_path, epub_path, title="Comic")
+
+            pages = write_epub.call_args.args[0]
+            self.assertIsNone(pages[0].image_data)
+            self.assertIsNotNone(pages[0].image_data_loader)
+
     def test_epub_contains_page_xhtml_for_each_image(self):
         with tempfile.TemporaryDirectory() as tmp:
             pdf_path = Path(tmp) / "comic.pdf"

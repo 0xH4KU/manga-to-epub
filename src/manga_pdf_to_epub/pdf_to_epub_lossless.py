@@ -36,7 +36,7 @@ def convert_pdf_to_epub(
     if epub_path.exists() and not overwrite:
         raise PdfImageError(f"Refusing to overwrite existing file: {epub_path}")
 
-    images = images_in_pdf_page_order(pdf_path)
+    images = images_in_pdf_page_order(pdf_path, load_payloads=False)
     if not images:
         raise PdfImageError(f"No image streams found in {pdf_path}")
 
@@ -75,7 +75,7 @@ def _build_pages(
             for blank_index in range(1, blank_pages_before_cover + 1):
                 counts["blank"] = counts.get("blank", 0) + 1
                 pages.append(_blank_page(image, blank_index, "before"))
-        page, ext = page_from_image(image, padding)
+        page, ext = page_from_image(image, padding, load_payload=False)
         counts[ext] = counts.get(ext, 0) + 1
         pages.append(page)
         if image.index == 1:

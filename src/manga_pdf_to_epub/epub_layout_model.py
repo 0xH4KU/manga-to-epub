@@ -54,7 +54,7 @@ class LayoutModel:
 
     @classmethod
     def from_pdf(cls, pdf_path: Path) -> "LayoutModel":
-        images = images_in_pdf_page_order(pdf_path)
+        images = images_in_pdf_page_order(pdf_path, load_payloads=False)
         entries = [_entry_from_image(image, max(4, len(str(len(images))))) for image in images]
         return cls(pdf_path, entries, source_page_count=len(images))
 
@@ -90,7 +90,6 @@ class LayoutModel:
             ext = "jpg"
         if ext not in {"jpg", "png"}:
             raise ValueError("Only JPEG and PNG images can be inserted")
-        data = image_path.read_bytes()
         width, height = _image_dimensions(image_path)
         item_number = self._next_external_image_number(item_id)
         item_id = item_id or f"inserted-{item_number:04d}"
@@ -100,10 +99,11 @@ class LayoutModel:
             height=height,
             image_href=f"images/{item_id}.{ext}",
             image_media_type=media_type_for_ext(ext),
-            image_data=data,
+            image_data=None,
             xhtml_href=f"xhtml/{item_id}.xhtml",
             item_id=item_id,
             label=image_path.stem,
+            image_data_loader=image_path.read_bytes,
         )
         self.entries.insert(index, LayoutEntry(image_path.stem, page, inserted_path=image_path))
 
@@ -197,7 +197,7 @@ class LayoutModel:
             ext = Path(entry.page.image_href or "").suffix.lower().lstrip(".")
             filename = f"{index + 1:0{padding}d}.{ext}"
             destination = _unique_path(output_dir / filename)
-            destination.write_bytes(entry.page.image_data or b"")
+            destination.write_bytes(entry.page.load_image_data())
             exported.append(destination)
         return exported, skipped
 
@@ -411,7 +411,7 @@ class LayoutModel:
 
 
 def _entry_from_image(image: ImageStream, padding: int) -> LayoutEntry:
-    page, _ext = page_from_image(image, padding)
+    page, _ext = page_from_image(image, padding, load_payload=False)
     return LayoutEntry(page.label, page, source_index=image.index)
 
 

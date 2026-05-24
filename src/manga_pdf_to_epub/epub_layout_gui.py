@@ -49,6 +49,8 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
         self.output_dir = Path.cwd() / "epub_layout_gui_exports"
         self.photo_refs: list[tk.PhotoImage] = []
         self.thumbnail_cache: ThumbnailCache = ThumbnailCache()
+        self._thumbnail_render_jobs: set[tuple] = set()
+        self._thumbnail_cache_generation = 0
         self._pdf_doc = None
         self._pdf_doc_path: Path | None = None
         self.deleted_history: DeleteHistory[LayoutEntry] = DeleteHistory()
@@ -1030,6 +1032,9 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
         cached = self.thumbnail_cache.get(cache_key)
         if cached is not None:
             return cached
+        if hasattr(self, "_thumbnail_render_jobs"):
+            self._start_thumbnail_render(page_index, max_w, max_h, cache_key)
+            return None
         try:
             doc = self._pdf_document()
             page = doc[page_index - 1]
@@ -1042,6 +1047,51 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
             if hasattr(self, "status"):
                 self.status.set(f"Preview failed for page {page_index}.")
             return None
+
+    def _start_thumbnail_render(self, page_index: int, max_w: int, max_h: int, cache_key: tuple) -> None:
+        if self.pdf_path is None or cache_key in self._thumbnail_render_jobs:
+            return
+        pdf_path = self.pdf_path
+        generation = self._thumbnail_cache_generation
+        self._thumbnail_render_jobs.add(cache_key)
+
+        def worker() -> None:
+            try:
+                png_data = self._render_pdf_thumbnail_bytes(pdf_path, page_index, max_w, max_h)
+                self.root.after(0, lambda: self._thumbnail_render_done(cache_key, pdf_path, generation, png_data, None))
+            except Exception as exc:
+                self.root.after(0, lambda exc=exc: self._thumbnail_render_done(cache_key, pdf_path, generation, None, exc))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _render_pdf_thumbnail_bytes(self, pdf_path: Path, page_index: int, max_w: int, max_h: int) -> bytes:
+        with fitz.open(pdf_path) as doc:
+            page = doc[page_index - 1]
+            zoom = min(max_w / page.rect.width, max_h / page.rect.height)
+            pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+            return pix.tobytes("png")
+
+    def _thumbnail_render_done(
+        self,
+        cache_key: tuple,
+        pdf_path: Path,
+        generation: int,
+        png_data: bytes | None,
+        exc: Exception | None,
+    ) -> None:
+        self._thumbnail_render_jobs.discard(cache_key)
+        if self.pdf_path != pdf_path or generation != self._thumbnail_cache_generation:
+            return
+        if exc is not None or png_data is None:
+            if hasattr(self, "status"):
+                self.status.set("Preview thumbnail render failed.")
+            return
+        try:
+            self.thumbnail_cache[cache_key] = tk.PhotoImage(data=png_data)
+            self.refresh_preview()
+        except Exception:
+            if hasattr(self, "status"):
+                self.status.set("Preview thumbnail render failed.")
 
     def _pdf_document(self):
         if self.pdf_path is None:
@@ -1068,6 +1118,9 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
             self.thumbnail_cache = ThumbnailCache()
         else:
             self.thumbnail_cache.clear()
+        if hasattr(self, "_thumbnail_render_jobs"):
+            self._thumbnail_render_jobs.clear()
+        self._thumbnail_cache_generation = getattr(self, "_thumbnail_cache_generation", 0) + 1
         self._close_pdf_document()
 
     def _thumbnail_for_entry(self, entry, max_w: int, max_h: int) -> tk.PhotoImage | None:
@@ -1076,7 +1129,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
         if cached is not None:
             return cached
         try:
-            image = tk.PhotoImage(data=entry.page.image_data)
+            image = tk.PhotoImage(data=entry.page.load_image_data())
             scale = max(1, int(max(image.width() / max_w, image.height() / max_h, 1)))
             if scale > 1:
                 image = image.subsample(scale, scale)

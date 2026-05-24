@@ -10,6 +10,16 @@ from tests.helpers import four_page_pdf, one_page_pdf, tiny_png, two_page_pdf_wi
 
 
 class EpubLayoutModelTests(unittest.TestCase):
+    def test_source_pdf_pages_are_loaded_lazily_in_layout_model(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            pdf_path.write_bytes(two_page_pdf_with_late_cover())
+
+            model = LayoutModel.from_pdf(pdf_path)
+
+            self.assertIsNone(model.entries[0].page.image_data)
+            self.assertIsNotNone(model.entries[0].page.image_data_loader)
+
     def test_inserts_blank_page_at_arbitrary_position_and_exports_order(self):
         with tempfile.TemporaryDirectory() as tmp:
             pdf_path = Path(tmp) / "comic.pdf"
@@ -422,6 +432,19 @@ class EpubLayoutModelTests(unittest.TestCase):
                 self.assertEqual(png, archive.read("EPUB/images/page-0002.png"))
                 opf = archive.read("EPUB/content.opf").decode("utf-8")
                 self.assertIn('href="images/page-0002.png" media-type="image/png"', opf)
+
+    def test_inserted_image_payload_is_loaded_lazily(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            image_path = Path(tmp) / "extra.png"
+            pdf_path.write_bytes(two_page_pdf_with_late_cover())
+            image_path.write_bytes(tiny_png())
+            model = LayoutModel.from_pdf(pdf_path)
+
+            model.insert_image(1, image_path)
+
+            self.assertIsNone(model.entries[1].page.image_data)
+            self.assertIsNotNone(model.entries[1].page.image_data_loader)
 
     def test_inserted_image_can_be_set_as_cover(self):
         with tempfile.TemporaryDirectory() as tmp:
