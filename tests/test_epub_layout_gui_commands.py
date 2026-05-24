@@ -1,7 +1,10 @@
 import unittest
+from io import BytesIO
 from pathlib import Path
-from unittest.mock import patch
 from types import SimpleNamespace
+from unittest.mock import patch
+
+from PIL import Image
 
 from manga_pdf_to_epub.gui.layout_app import EpubLayoutApp
 
@@ -12,6 +15,7 @@ from tests.gui_helpers import (
     FakeStatus,
     entry,
 )
+from tests.helpers import tiny_png
 
 
 class EpubLayoutGuiCommandTests(unittest.TestCase):
@@ -299,16 +303,39 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.pdf_path = Path("/tmp/book.cbz")
         app.thumbnail_cache = {}
+        png_data = tiny_png()
         entry_obj = SimpleNamespace(
             source_index=1,
-            page=SimpleNamespace(item_id="page-0001", load_image_data=lambda: b"PNG"),
+            page=SimpleNamespace(item_id="page-0001", load_image_data=lambda: png_data),
         )
 
-        with patch("manga_pdf_to_epub.gui.layout_app.tk.PhotoImage", return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20)) as photo:
+        with patch(
+            "manga_pdf_to_epub.gui.layout_app.tk.PhotoImage",
+            return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20),
+        ) as photo:
             thumbnail = app._thumbnail_for_source_entry(entry_obj, 120, 180)
 
         self.assertIsNotNone(thumbnail)
-        photo.assert_called_once_with(data=b"PNG")
+        photo.assert_called_once_with(data=png_data)
+
+    def test_thumbnail_for_archive_jpeg_source_page_converts_payload_to_png(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.pdf_path = Path("/tmp/book.zip")
+        app.thumbnail_cache = {}
+        entry_obj = SimpleNamespace(
+            source_index=1,
+            page=SimpleNamespace(item_id="page-0001", load_image_data=_tiny_jpeg),
+        )
+
+        with patch(
+            "manga_pdf_to_epub.gui.layout_app.tk.PhotoImage",
+            return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20),
+        ) as photo:
+            thumbnail = app._thumbnail_for_source_entry(entry_obj, 120, 180)
+
+        self.assertIsNotNone(thumbnail)
+        image_data = photo.call_args.kwargs["data"]
+        self.assertEqual(b"\x89PNG\r\n\x1a\n", image_data[:8])
 
     def test_thumbnail_render_done_caches_image_and_refreshes_current_pdf(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
@@ -391,6 +418,14 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app.refresh_list()
 
         self.assertEqual("0002 [page] [cover] Page 2", app.page_list.items[1])
+
+
+def _tiny_jpeg() -> bytes:
+    image = Image.new("RGB", (12, 16), (120, 80, 40))
+    output = BytesIO()
+    image.save(output, format="JPEG")
+    return output.getvalue()
+
 
 if __name__ == "__main__":
     unittest.main()

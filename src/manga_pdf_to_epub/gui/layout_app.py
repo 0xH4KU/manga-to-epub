@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import threading
 import tkinter as tk
+from io import BytesIO
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
@@ -262,6 +263,8 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
     def _show_inspector_tab(self, title: str) -> None:
         if title not in self.inspector_tabs:
             return
+        if getattr(self, "active_inspector_tab", None) == "Book" and title != "Book":
+            self._store_metadata_fields()
         self.active_inspector_tab = title
         self.inspector_tabs[title].tkraise()
         for tab_title, button in getattr(self, "inspector_tab_buttons", {}).items():
@@ -1148,7 +1151,11 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
         if cached is not None:
             return cached
         try:
-            image = tk.PhotoImage(data=entry.page.load_image_data())
+            image_data = entry.page.load_image_data()
+            if _is_png_payload(image_data):
+                image = tk.PhotoImage(data=image_data)
+            else:
+                image = tk.PhotoImage(data=_preview_png_thumbnail(image_data, max_w, max_h))
             scale = max(1, int(max(image.width() / max_w, image.height() / max_h, 1)))
             if scale > 1:
                 image = image.subsample(scale, scale)
@@ -1165,6 +1172,24 @@ def main() -> int:
     EpubLayoutApp(root)
     root.mainloop()
     return 0
+
+
+def _is_png_payload(payload: bytes) -> bool:
+    return payload.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def _preview_png_thumbnail(payload: bytes, max_w: int, max_h: int) -> bytes:
+    from PIL import Image, ImageOps
+
+    with Image.open(BytesIO(payload)) as image:
+        frame = ImageOps.exif_transpose(image)
+        if frame.mode not in {"RGB", "RGBA"}:
+            has_alpha = "A" in frame.getbands() or (frame.mode == "P" and "transparency" in frame.info)
+            frame = frame.convert("RGBA" if has_alpha else "RGB")
+        frame.thumbnail((max(1, max_w), max(1, max_h)), Image.Resampling.LANCZOS)
+        output = BytesIO()
+        frame.save(output, format="PNG")
+        return output.getvalue()
 
 
 if __name__ == "__main__":
