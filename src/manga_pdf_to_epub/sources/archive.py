@@ -106,14 +106,17 @@ def _is_junk_path(path: PurePosixPath) -> bool:
 def _archive_image(archive_path: Path, member: _ArchiveMember, index: int, load_payloads: bool) -> ArchiveImage:
     ext = _source_ext(member.path.name)
     label = member.path.stem
+    raw = _read_member(archive_path, member.info)
     if ext in _DIRECT_IMAGE_EXTS:
         payload = _payload_or_loader(load_payloads, lambda: _read_member(archive_path, member.info))
-        width, height = _image_dimensions(_read_member(archive_path, member.info))
+        width, height = _image_dimensions(raw)
         epub_ext = "jpg" if ext in _JPEG_IMAGE_EXTS else "png"
     else:
-        raw = _read_member(archive_path, member.info)
         width, height = _image_dimensions(raw)
-        payload = _payload_or_loader(load_payloads, lambda: _image_bytes_to_png(raw, member.path.as_posix()))
+        payload = _payload_or_loader(
+            load_payloads,
+            lambda: _image_bytes_to_png(_read_member(archive_path, member.info), member.path.as_posix()),
+        )
         epub_ext = "png"
     return ArchiveImage(
         index=index,

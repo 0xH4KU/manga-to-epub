@@ -3,11 +3,13 @@ import unittest
 import warnings
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 from zipfile import ZipFile, ZipInfo
 
 from PIL import Image
 
 from manga_pdf_to_epub.pdf.image_types import PdfImageError
+from manga_pdf_to_epub.sources import archive as archive_source
 from manga_pdf_to_epub.sources.archive import archive_images_in_page_order
 from tests.helpers import tiny_png
 
@@ -57,6 +59,30 @@ class ArchiveSourceTests(unittest.TestCase):
             self.assertEqual([3, 4, 5, 6], [image.height for image in images])
             for image in images:
                 self.assertTrue(image.load_data().startswith(b"\x89PNG\r\n\x1a\n"))
+
+    def test_converted_archive_payload_is_loaded_only_on_demand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive_path = Path(tmp) / "comic.zip"
+            raw_payload = _render_sample_image("webp")
+            with ZipFile(archive_path, "w") as archive:
+                archive.writestr("page-1.webp", raw_payload)
+
+            read_calls = []
+            original_read_member = archive_source._read_member
+
+            def tracking_read_member(path, member_info):
+                read_calls.append(member_info.filename)
+                return original_read_member(path, member_info)
+
+            with patch("manga_pdf_to_epub.sources.archive._read_member", tracking_read_member):
+                images = archive_images_in_page_order(archive_path, load_payloads=False)
+                self.assertEqual(["page-1.webp"], read_calls)
+                self.assertIsNone(images[0].data)
+
+                payload = images[0].load_data()
+
+            self.assertEqual(["page-1.webp", "page-1.webp"], read_calls)
+            self.assertTrue(payload.startswith(b"\x89PNG\r\n\x1a\n"))
 
     def test_archive_imports_common_camera_and_modern_image_extensions(self):
         with tempfile.TemporaryDirectory() as tmp:

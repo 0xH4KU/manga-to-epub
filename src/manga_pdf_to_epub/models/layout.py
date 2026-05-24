@@ -361,7 +361,7 @@ class LayoutModel:
         if not any(not entry.is_blank for entry in self.entries):
             raise PdfImageError("Cannot export an EPUB without image pages")
         self._ensure_valid_cover()
-        counts = self._counts()
+        counts = self.page_counts()
         return write_epub_from_pages(
             self.normalized_pages(),
             epub_path,
@@ -374,6 +374,9 @@ class LayoutModel:
             exclude_cover_from_reading=self.exclude_cover_from_reading,
             counts=counts,
         )
+
+    def page_counts(self) -> dict[str, int]:
+        return self._counts()
 
     def _counts(self) -> dict[str, int]:
         counts: dict[str, int] = {"jpg": 0, "png": 0}

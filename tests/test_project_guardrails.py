@@ -27,14 +27,17 @@ class ProjectGuardrailTests(unittest.TestCase):
         self.assertEqual([], [str(path) for path in expected_packages if not path.is_dir()])
 
     def test_gui_module_keeps_delete_history_in_dedicated_helper(self):
-        source = Path("src/manga_pdf_to_epub/gui/layout_app.py").read_text(encoding="utf-8")
-        self.assertIn("from .layout_history import CoverState, DeleteHistory", source)
-        self.assertNotIn("deleted_cover_states", source)
+        app_source = Path("src/manga_pdf_to_epub/gui/layout_app.py").read_text(encoding="utf-8")
+        delete_source = Path("src/manga_pdf_to_epub/gui/layout_delete_controller.py").read_text(encoding="utf-8")
 
-    def test_gui_app_class_stays_below_current_complexity_ceiling(self):
+        self.assertIn("from .layout_history import CoverState, DeleteHistory", delete_source)
+        self.assertNotIn("deleted_cover_states", app_source)
+        self.assertNotIn("deleted_cover_states", delete_source)
+
+    def test_gui_app_class_stays_small_by_delegating_workflows_to_mixins(self):
         tree = ast.parse(Path("src/manga_pdf_to_epub/gui/layout_app.py").read_text(encoding="utf-8"))
         app_class = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "EpubLayoutApp")
-        self.assertLessEqual(app_class.end_lineno - app_class.lineno + 1, 1200)
+        self.assertLessEqual(app_class.end_lineno - app_class.lineno + 1, 260)
 
     def test_gui_series_workflow_lives_in_dedicated_controller(self):
         source = Path("src/manga_pdf_to_epub/gui/layout_app.py").read_text(encoding="utf-8")
@@ -42,6 +45,54 @@ class ProjectGuardrailTests(unittest.TestCase):
 
         self.assertTrue(controller.exists())
         self.assertIn("from .layout_series_controller import EpubLayoutSeriesMixin", source)
+
+    def test_gui_main_file_uses_dedicated_workflow_controllers(self):
+        source = Path("src/manga_pdf_to_epub/gui/layout_app.py").read_text(encoding="utf-8")
+
+        for import_line in (
+            "from .layout_workbench import EpubLayoutWorkbenchMixin",
+            "from .layout_inspector_controller import EpubLayoutInspectorMixin",
+            "from .layout_navigation_controller import EpubLayoutNavigationMixin",
+            "from .layout_command_palette_controller import EpubLayoutCommandPaletteMixin",
+            "from .layout_spine_controller import EpubLayoutSpineMixin",
+            "from .layout_edit_controller import EpubLayoutEditMixin",
+            "from .layout_delete_controller import EpubLayoutDeleteMixin",
+            "from .layout_cover_controller import EpubLayoutCoverMixin",
+            "from .layout_metadata_controller import EpubLayoutMetadataMixin",
+            "from .layout_thumbnail_controller import EpubLayoutThumbnailMixin",
+            "from .layout_preview_controller import EpubLayoutPreviewMixin",
+        ):
+            self.assertIn(import_line, source)
+
+    def test_gui_controllers_stay_focused_by_responsibility(self):
+        focused_classes = (
+            ("src/manga_pdf_to_epub/gui/layout_workbench.py", "EpubLayoutWorkbenchMixin", 160),
+            ("src/manga_pdf_to_epub/gui/layout_edit_controller.py", "EpubLayoutEditMixin", 160),
+            ("src/manga_pdf_to_epub/gui/layout_preview_controller.py", "EpubLayoutPreviewMixin", 170),
+            ("src/manga_pdf_to_epub/gui/layout_diagnosis_view_controller.py", "EpubLayoutDiagnosisViewMixin", 220),
+            ("src/manga_pdf_to_epub/gui/layout_series_controller.py", "EpubLayoutSeriesMixin", 80),
+        )
+
+        for path, class_name, limit in focused_classes:
+            tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+            target_class = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == class_name)
+            with self.subTest(path=path, class_name=class_name):
+                self.assertLessEqual(target_class.end_lineno - target_class.lineno + 1, limit)
+
+    def test_diagnosis_controller_stays_split_by_responsibility(self):
+        app_source = Path("src/manga_pdf_to_epub/gui/layout_app.py").read_text(encoding="utf-8")
+        controller_path = Path("src/manga_pdf_to_epub/gui/layout_diagnosis_controller.py")
+        tree = ast.parse(controller_path.read_text(encoding="utf-8"))
+        diagnosis_class = next(
+            node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "EpubLayoutDiagnosisMixin"
+        )
+
+        self.assertLessEqual(diagnosis_class.end_lineno - diagnosis_class.lineno + 1, 180)
+        for import_line in (
+            "from .layout_diagnosis_view_controller import EpubLayoutDiagnosisViewMixin",
+            "from .layout_diagnosis_io_controller import EpubLayoutDiagnosisIOMixin",
+        ):
+            self.assertIn(import_line, app_source)
 
     def test_gui_behavior_tests_stay_split_by_workflow(self):
         test_files = [
@@ -86,26 +137,21 @@ class ProjectGuardrailTests(unittest.TestCase):
         self.assertIn('manga-to-epub = "manga_pdf_to_epub.cli.pdf_to_epub_lossless:main"', pyproject)
         self.assertIn('pdf-to-epub-lossless = "manga_pdf_to_epub.cli.pdf_to_epub_lossless:main"', pyproject)
 
-    def test_smoke_uses_python_scripts_dir_for_console_commands(self):
+    def test_smoke_uses_active_python_instead_of_stale_console_script_shebangs(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             fake_bin = tmp_path / "bin"
             fake_bin.mkdir()
             fake_python = fake_bin / "python"
-            fake_scripts = tmp_path / "python-scripts"
-            fake_scripts.mkdir()
             fake_python.write_text(
                 "#!/bin/sh\n"
-                "if [ \"$1\" = \"-c\" ]; then\n"
-                "  printf '%s\\n' \"$FAKE_PYTHON_SCRIPTS\"\n"
-                "fi\n",
+                "printf '%s\\n' \"$0 $*\"\n",
                 encoding="utf-8",
             )
             fake_python.chmod(fake_python.stat().st_mode | stat.S_IXUSR)
 
             env = os.environ.copy()
             env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
-            env["FAKE_PYTHON_SCRIPTS"] = str(fake_scripts)
 
             result = subprocess.run(
                 ["make", "-n", "smoke", "PYTHON=python"],
@@ -117,8 +163,23 @@ class ProjectGuardrailTests(unittest.TestCase):
 
         self.assertNotIn("./manga-to-epub", result.stdout)
         self.assertNotIn("./pdf-to-epub-lossless", result.stdout)
-        self.assertIn(f'"{fake_scripts}/manga-to-epub" --help', result.stdout)
-        self.assertIn(f'"{fake_scripts}/pdf-to-epub-lossless" --help', result.stdout)
+        self.assertNotIn("/manga-to-epub\" --help", result.stdout)
+        self.assertIn("python -m manga_pdf_to_epub.cli.pdf_to_epub_lossless --help", result.stdout)
+        self.assertIn("python scripts/manga_to_epub.py --help", result.stdout)
+
+    def test_lint_runs_ruff_before_compileall(self):
+        result = subprocess.run(
+            ["make", "-n", "lint", "PYTHON=python"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("python -m ruff check src tests scripts", result.stdout)
+        self.assertLess(
+            result.stdout.index("python -m ruff check"),
+            result.stdout.index("compileall"),
+        )
 
 
 if __name__ == "__main__":

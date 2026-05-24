@@ -83,11 +83,11 @@ def convert_source_to_epub(
             for _ in range(blank_pages_after_cover):
                 model.insert_blank(min(1, len(model.entries)))
             pages = model.normalized_pages()
-            counts = model._counts()
+            counts = model.page_counts()
         else:
             model = LayoutModel.from_source(source_path)
             pages = model.normalized_pages()
-            counts = model._counts()
+            counts = model.page_counts()
 
     book_title = title or source_path.stem
     return write_epub_from_pages(

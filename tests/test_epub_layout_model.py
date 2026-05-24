@@ -338,6 +338,15 @@ class EpubLayoutModelTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 model.delete_range(2, 1)
 
+    def test_page_counts_reports_current_layout_without_private_api(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdf_path = Path(tmp) / "comic.pdf"
+            pdf_path.write_bytes(two_page_pdf_with_late_cover())
+            model = LayoutModel.from_pdf(pdf_path)
+            model.insert_blank(1)
+
+            self.assertEqual({"jpg": 2, "png": 0, "blank": 1}, model.page_counts())
+
     def test_export_normalizes_deleted_source_page_to_sequential_epub_names(self):
         with tempfile.TemporaryDirectory() as tmp:
             pdf_path = Path(tmp) / "comic.pdf"

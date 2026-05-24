@@ -15,10 +15,12 @@ from manga_pdf_to_epub.gui.layout_diagnosis import (
 from manga_pdf_to_epub.gui.layout_diagnosis_runner import DiagnosisSettings
 from manga_pdf_to_epub.gui.layout_app import EpubLayoutApp
 from manga_pdf_to_epub.gui.layout_diagnosis_controller import (
+    reset_diagnosis_for_model,
+)
+from manga_pdf_to_epub.gui.layout_diagnosis_io_controller import (
     _run_insert_scoring_work,
     _run_spread_scan_work,
     diagnosis_output_root_for_current_pdf,
-    reset_diagnosis_for_model,
 )
 from manga_pdf_to_epub.gui.layout_diagnosis_window import (
     DiagnosisPanel,
@@ -624,8 +626,8 @@ class DiagnosisImportUxTests(unittest.TestCase):
         app.pdf_path = Path("/tmp/book.pdf")
         app.diagnosis_session = DiagnosisSession(source_page_count=2)
 
-        with patch("manga_pdf_to_epub.gui.layout_diagnosis_controller.resolve_spread_scan_command", return_value=None), \
-            patch("manga_pdf_to_epub.gui.layout_diagnosis_controller.messagebox.showerror") as showerror:
+        with patch("manga_pdf_to_epub.gui.layout_diagnosis_io_controller.resolve_spread_scan_command", return_value=None), \
+            patch("manga_pdf_to_epub.gui.layout_diagnosis_io_controller.messagebox.showerror") as showerror:
             app.run_spread_diagnosis()
 
         title, message = showerror.call_args.args
@@ -710,7 +712,7 @@ class DiagnosisSettingsTests(unittest.TestCase):
         app.diagnosis_settings = SimpleNamespace(spread_workers=6)
         app._run_background = lambda *_args, **_kwargs: setattr(app, "background_started", True)
 
-        with patch("manga_pdf_to_epub.gui.layout_diagnosis_controller.resolve_spread_scan_command") as resolve:
+        with patch("manga_pdf_to_epub.gui.layout_diagnosis_io_controller.resolve_spread_scan_command") as resolve:
             resolve.return_value = SimpleNamespace()
             app.run_spread_diagnosis()
 
@@ -743,7 +745,7 @@ class DiagnosisSettingsTests(unittest.TestCase):
             (output_root / "spread" / "scores.csv").write_text("old", encoding="utf-8")
 
             with patch(
-                "manga_pdf_to_epub.gui.layout_diagnosis_controller.diagnosis_output_root_for_current_pdf",
+                "manga_pdf_to_epub.gui.layout_diagnosis_io_controller.diagnosis_output_root_for_current_pdf",
                 return_value=output_root,
             ):
                 app.clear_current_diagnostics_output()
@@ -757,7 +759,7 @@ class DiagnosisSettingsTests(unittest.TestCase):
         app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
 
         with tempfile.TemporaryDirectory() as tmp, patch(
-            "manga_pdf_to_epub.gui.layout_diagnosis_controller.diagnosis_output_root_for_current_pdf",
+            "manga_pdf_to_epub.gui.layout_diagnosis_io_controller.diagnosis_output_root_for_current_pdf",
             return_value=Path(tmp) / "missing",
         ):
             app.clear_current_diagnostics_output()
@@ -1042,7 +1044,7 @@ class DiagnosisSpineViewTests(unittest.TestCase):
             def __init__(self, *_args):
                 self.spine_list = FakeListbox(selection=None)
 
-        with patch("manga_pdf_to_epub.gui.layout_diagnosis_controller.DiagnosisWindow", FakeDiagnosisWindow):
+        with patch("manga_pdf_to_epub.gui.layout_diagnosis_view_controller.DiagnosisWindow", FakeDiagnosisWindow):
             app.open_diagnose_window()
 
         self.assertEqual(["0001 [page] Page 1", "0002 [page] Page 2"], app.diagnosis_window.spine_list.items)
@@ -1287,7 +1289,7 @@ class DiagnosisWindowLifecycleTests(unittest.TestCase):
             def focus(self):
                 self.focus_count += 1
 
-        with patch("manga_pdf_to_epub.gui.layout_diagnosis_controller.DiagnosisWindow", FakeDiagnosisWindow):
+        with patch("manga_pdf_to_epub.gui.layout_diagnosis_view_controller.DiagnosisWindow", FakeDiagnosisWindow):
             app.open_diagnose_window()
             app.open_diagnose_window()
 
@@ -1562,7 +1564,7 @@ class DiagnosisSpreadScanWorkflowTests(unittest.TestCase):
             )
 
             with patch(
-                "manga_pdf_to_epub.gui.layout_diagnosis_controller.run_diagnosis_command",
+                "manga_pdf_to_epub.gui.layout_diagnosis_io_controller.run_diagnosis_command",
                 return_value=SimpleNamespace(output_dir=output_dir),
             ):
                 candidates = _run_spread_scan_work(SimpleNamespace(), source_page_count=50)
@@ -1578,7 +1580,7 @@ class DiagnosisSpreadScanWorkflowTests(unittest.TestCase):
             )
 
             with patch(
-                "manga_pdf_to_epub.gui.layout_diagnosis_controller.run_diagnosis_command",
+                "manga_pdf_to_epub.gui.layout_diagnosis_io_controller.run_diagnosis_command",
                 return_value=SimpleNamespace(output_dir=output_dir),
             ):
                 with self.assertRaisesRegex(ValueError, "adjacent"):
@@ -1601,7 +1603,7 @@ class DiagnosisSpreadScanWorkflowTests(unittest.TestCase):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
 
-        with patch("manga_pdf_to_epub.gui.layout_diagnosis_controller.messagebox.showerror") as showerror:
+        with patch("manga_pdf_to_epub.gui.layout_diagnosis_io_controller.messagebox.showerror") as showerror:
             app._spread_scan_failed(ValueError("bad csv"))
 
         self.assertEqual("Cross-page scan failed.", app.status_value)
@@ -1660,7 +1662,7 @@ class DiagnosisInsertWorkflowTests(unittest.TestCase):
             )
 
             with patch(
-                "manga_pdf_to_epub.gui.layout_diagnosis_controller.filedialog.askopenfilename",
+                "manga_pdf_to_epub.gui.layout_diagnosis_io_controller.filedialog.askopenfilename",
                 return_value=str(path),
             ):
                 app._load_insert_candidates = lambda candidates: setattr(app, "loaded", candidates)
@@ -1678,7 +1680,7 @@ class DiagnosisInsertWorkflowTests(unittest.TestCase):
             )
 
             with patch(
-                "manga_pdf_to_epub.gui.layout_diagnosis_controller.run_diagnosis_command",
+                "manga_pdf_to_epub.gui.layout_diagnosis_io_controller.run_diagnosis_command",
                 return_value=SimpleNamespace(output_dir=output_dir),
             ):
                 candidates = _run_insert_scoring_work(SimpleNamespace())
@@ -1689,7 +1691,7 @@ class DiagnosisInsertWorkflowTests(unittest.TestCase):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
 
-        with patch("manga_pdf_to_epub.gui.layout_diagnosis_controller.messagebox.showerror") as showerror:
+        with patch("manga_pdf_to_epub.gui.layout_diagnosis_io_controller.messagebox.showerror") as showerror:
             app._insert_scoring_failed(ValueError("bad gaps"))
 
         self.assertEqual("Insert-point scoring failed.", app.status_value)

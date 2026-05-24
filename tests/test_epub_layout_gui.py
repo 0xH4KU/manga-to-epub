@@ -6,7 +6,6 @@ from manga_pdf_to_epub.gui.layout_app import EpubLayoutApp
 
 from tests.gui_helpers import (
     FakeBool,
-    FakeListbox,
     FakeRoot,
     FakeStatus,
     FakeWidget,
@@ -110,16 +109,16 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             def bbox(self, *_args, **_kwargs):
                 return (0, 0, 1, 1)
 
-        with patch("manga_pdf_to_epub.gui.layout_app.ttk.Frame", FakeFrame), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Panedwindow", FakePanedwindow), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Button", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Label", FakeLabel), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Checkbutton", FakeCheckbutton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Scrollbar", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Separator", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Entry", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Listbox", FakeListbox), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Canvas", FakeCanvas):
+        with patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Frame", FakeFrame), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Panedwindow", FakePanedwindow), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Button", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Label", FakeLabel), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Checkbutton", FakeCheckbutton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
 
         labels = [widget.options.get("text") for widget in widgets]
@@ -181,16 +180,16 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             def bbox(self, *_args, **_kwargs):
                 return (0, 0, 1, 1)
 
-        with patch("manga_pdf_to_epub.gui.layout_app.ttk.Frame", FakeFrame), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Panedwindow", FakePanedwindow), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Button", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Label", FakeLabel), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Checkbutton", FakeCheckbutton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Scrollbar", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Separator", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Entry", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Listbox", FakeListbox), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Canvas", FakeCanvas):
+        with patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Frame", FakeFrame), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Panedwindow", FakePanedwindow), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Button", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Label", FakeLabel), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Checkbutton", FakeCheckbutton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
 
         button_by_label = {button.options.get("text"): button for button in buttons}
@@ -250,16 +249,16 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             def bbox(self, *_args, **_kwargs):
                 return (0, 0, 1, 1)
 
-        with patch("manga_pdf_to_epub.gui.layout_app.ttk.Frame", FakeFrame), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Panedwindow", FakePanedwindow), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Button", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Label", FakeLabel), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Checkbutton", FakeCheckbutton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Scrollbar", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Separator", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Entry", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Listbox", FakeListbox), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Canvas", FakeCanvas):
+        with patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Frame", FakeFrame), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Panedwindow", FakePanedwindow), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Button", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Label", FakeLabel), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Checkbutton", FakeCheckbutton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
 
         labels = [widget.options.get("text") for widget in widgets]
@@ -336,16 +335,16 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             def bbox(self, *_args, **_kwargs):
                 return (0, 0, 1, 1)
 
-        with patch("manga_pdf_to_epub.gui.layout_app.ttk.Frame", FakeFrame), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Panedwindow", FakePanedwindow), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Button", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Label", FakeLabel), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Checkbutton", FakeCheckbutton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Scrollbar", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Separator", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Entry", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Listbox", FakeListbox), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Canvas", FakeCanvas):
+        with patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Frame", FakeFrame), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Panedwindow", FakePanedwindow), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Button", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Label", FakeLabel), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Checkbutton", FakeCheckbutton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
 
         toolbar = frames[0]
@@ -430,16 +429,16 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             def bbox(self, *_args, **_kwargs):
                 return (0, 0, 1, 1)
 
-        with patch("manga_pdf_to_epub.gui.layout_app.ttk.Frame", FakeFrame), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Panedwindow", FakePanedwindow), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Button", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Label", FakeLabel), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Checkbutton", FakeCheckbutton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Scrollbar", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Separator", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Entry", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Listbox", FakeListbox), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Canvas", FakeCanvas):
+        with patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Frame", FakeFrame), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Panedwindow", FakePanedwindow), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Button", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Label", FakeLabel), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Checkbutton", FakeCheckbutton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
 
         labels = [widget.options.get("text") for widget in widgets]
@@ -503,16 +502,16 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             def bbox(self, *_args, **_kwargs):
                 return (0, 0, 1, 1)
 
-        with patch("manga_pdf_to_epub.gui.layout_app.ttk.Frame", FakeFrame), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Panedwindow", FakePanedwindow), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Button", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Label", FakeLabel), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Checkbutton", FakeCheckbutton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Scrollbar", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Separator", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.ttk.Entry", FakeButton), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Listbox", FakeListbox), \
-            patch("manga_pdf_to_epub.gui.layout_app.tk.Canvas", FakeCanvas):
+        with patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Frame", FakeFrame), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Panedwindow", FakePanedwindow), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Button", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Label", FakeLabel), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Checkbutton", FakeCheckbutton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
 
         self.assertEqual(app.series_list.parent, app.series_pane)

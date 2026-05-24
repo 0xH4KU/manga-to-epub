@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import mimetypes
 import uuid
 from dataclasses import dataclass
 from pathlib import Path

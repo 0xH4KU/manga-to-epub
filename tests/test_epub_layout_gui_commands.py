@@ -278,7 +278,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app._pdf_doc = FakeDoc()
         app._pdf_doc_path = app.pdf_path
 
-        with patch("manga_pdf_to_epub.gui.layout_app.tk.PhotoImage", return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20)) as photo:
+        with patch("manga_pdf_to_epub.gui.layout_preview_controller.tk.PhotoImage", return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20)) as photo:
             first = app._thumbnail_for_page(1, 120, 180)
             second = app._thumbnail_for_page(1, 121, 181)
 
@@ -310,7 +310,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         )
 
         with patch(
-            "manga_pdf_to_epub.gui.layout_app.tk.PhotoImage",
+            "manga_pdf_to_epub.gui.layout_preview_controller.tk.PhotoImage",
             return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20),
         ) as photo:
             thumbnail = app._thumbnail_for_source_entry(entry_obj, 120, 180)
@@ -328,7 +328,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         )
 
         with patch(
-            "manga_pdf_to_epub.gui.layout_app.tk.PhotoImage",
+            "manga_pdf_to_epub.gui.layout_preview_controller.tk.PhotoImage",
             return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20),
         ) as photo:
             thumbnail = app._thumbnail_for_source_entry(entry_obj, 120, 180)
@@ -346,7 +346,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
         photo_image = object()
 
-        with patch("manga_pdf_to_epub.gui.layout_app.tk.PhotoImage", return_value=photo_image) as photo:
+        with patch("manga_pdf_to_epub.gui.layout_preview_controller.tk.PhotoImage", return_value=photo_image) as photo:
             app._thumbnail_render_done(("pdf", 1, 100, 150), Path("/tmp/book.pdf"), 2, b"PNG", None)
 
         photo.assert_called_once_with(data=b"PNG")
