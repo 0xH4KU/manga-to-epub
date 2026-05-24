@@ -9,8 +9,8 @@ dependencies = [
 ]
 
 [project.scripts]
-pdf-to-epub-lossless = "manga_pdf_to_epub.pdf_to_epub_lossless:main"
-epub-layout-gui = "manga_pdf_to_epub.epub_layout_gui:main"
+pdf-to-epub-lossless = "manga_pdf_to_epub.cli.pdf_to_epub_lossless:main"
+epub-layout-gui = "manga_pdf_to_epub.gui.layout_app:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

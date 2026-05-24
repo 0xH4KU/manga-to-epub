@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from manga_pdf_to_epub.epub_layout_diagnosis_runner import (
+from manga_pdf_to_epub.gui.layout_diagnosis_runner import (
     DiagnosisCommand,
     DiagnosisSettings,
     default_diagnosis_output_dir,

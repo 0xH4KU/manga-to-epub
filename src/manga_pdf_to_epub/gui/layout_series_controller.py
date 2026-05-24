@@ -5,9 +5,9 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from .epub_layout_diagnosis_controller import reset_diagnosis_for_model
-from .epub_layout_series_workflow import series_export_preflight
-from .epub_series_model import SeriesProject, SeriesVolume
+from .layout_diagnosis_controller import reset_diagnosis_for_model
+from .layout_series_workflow import series_export_preflight
+from ..models.series import SeriesProject, SeriesVolume
 
 
 class EpubLayoutSeriesMixin:

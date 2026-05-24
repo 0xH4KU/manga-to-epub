@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
 
-from manga_pdf_to_epub.epub_layout_gui import EpubLayoutApp
+from manga_pdf_to_epub.gui.layout_app import EpubLayoutApp
 
 from tests.gui_helpers import (
     FakeBool,
@@ -104,8 +104,8 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         app.refresh_preview_views = lambda: setattr(app, "preview_refreshed", True)
         app.refresh_diagnosis_panel = lambda: setattr(app, "diagnosis_refreshed", True)
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.filedialog.askopenfilename", return_value="/tmp/layout.json"), \
-            patch("manga_pdf_to_epub.epub_layout_gui.simpledialog.askstring") as askstring:
+        with patch("manga_pdf_to_epub.gui.layout_app.filedialog.askopenfilename", return_value="/tmp/layout.json"), \
+            patch("manga_pdf_to_epub.gui.layout_app.simpledialog.askstring") as askstring:
             app.load_preset()
 
         self.assertEqual([Path("/tmp/layout.json")], app.model.applied_presets)
@@ -150,8 +150,8 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         app.refresh_workspace_status = lambda: setattr(app, "workspace_refreshed", True)
         app.refresh_diagnosis_panel = lambda: setattr(app, "diagnosis_refreshed", True)
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.filedialog.askopenfilename", return_value="/tmp/layout.json"), \
-            patch("manga_pdf_to_epub.epub_layout_gui.simpledialog.askstring", return_value="1,7"):
+        with patch("manga_pdf_to_epub.gui.layout_app.filedialog.askopenfilename", return_value="/tmp/layout.json"), \
+            patch("manga_pdf_to_epub.gui.layout_app.simpledialog.askstring", return_value="1,7"):
             app.load_preset()
 
         self.assertEqual([Path("/tmp/layout.json")], volumes[0].layout_model.applied_presets)
@@ -173,8 +173,8 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         app.series_project = SimpleNamespace(volumes=[])
         app.status = FakeStatus()
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.filedialog.askopenfilename", return_value="/tmp/layout.json"), \
-            patch("manga_pdf_to_epub.epub_layout_gui.simpledialog.askstring", return_value=""):
+        with patch("manga_pdf_to_epub.gui.layout_app.filedialog.askopenfilename", return_value="/tmp/layout.json"), \
+            patch("manga_pdf_to_epub.gui.layout_app.simpledialog.askstring", return_value=""):
             app.load_preset()
 
         self.assertEqual([], app.model.applied_presets)
@@ -188,7 +188,7 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         project = SimpleNamespace(to_payload=lambda project_path: {"version": 1, "path": str(project_path)})
         app.series_project = project
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.asksaveasfilename", return_value="/tmp/series-project.json"):
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.asksaveasfilename", return_value="/tmp/series-project.json"):
             app.save_project()
 
         self.assertTrue(app.metadata_stored)
@@ -211,7 +211,7 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         app.series_project = project
         app.active_series_volume = active
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.asksaveasfilename", return_value="/tmp/active-series-project.json"):
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.asksaveasfilename", return_value="/tmp/active-series-project.json"):
             app.save_project()
 
         self.assertEqual(2, project.active_volume_number)
@@ -236,8 +236,8 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         volume = SimpleNamespace(pdf_path=Path("/tmp/vol01.pdf"), volume_number=1, status="Ready")
         loaded_project = SimpleNamespace(volumes=[volume], title="Series", author="", language="zh-Hant")
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.askopenfilename", return_value=str(payload_path)), \
-            patch("manga_pdf_to_epub.epub_layout_series_controller.SeriesProject.from_payload", return_value=loaded_project) as from_payload:
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askopenfilename", return_value=str(payload_path)), \
+            patch("manga_pdf_to_epub.gui.layout_series_controller.SeriesProject.from_payload", return_value=loaded_project) as from_payload:
             app.open_project()
 
         from_payload.assert_called_once_with({"version": 1}, payload_path)
@@ -278,9 +278,9 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         payload_path.write_text(json.dumps({"version": 1}), encoding="utf-8")
         loaded_project = SimpleNamespace(volumes=[], title="Series", author="", language="zh-Hant")
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.askopenfilename", return_value=str(payload_path)), \
-            patch("manga_pdf_to_epub.epub_layout_series_controller.SeriesProject.from_payload", return_value=loaded_project), \
-            patch("manga_pdf_to_epub.epub_layout_series_controller.messagebox.showerror") as showerror:
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askopenfilename", return_value=str(payload_path)), \
+            patch("manga_pdf_to_epub.gui.layout_series_controller.SeriesProject.from_payload", return_value=loaded_project), \
+            patch("manga_pdf_to_epub.gui.layout_series_controller.messagebox.showerror") as showerror:
             app.open_project()
 
         showerror.assert_not_called()
@@ -311,8 +311,8 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         ]
         loaded_project = SimpleNamespace(volumes=volumes, title="Series", author="", language="zh-Hant", active_volume_number=2)
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.askopenfilename", return_value=str(payload_path)), \
-            patch("manga_pdf_to_epub.epub_layout_series_controller.SeriesProject.from_payload", return_value=loaded_project):
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askopenfilename", return_value=str(payload_path)), \
+            patch("manga_pdf_to_epub.gui.layout_series_controller.SeriesProject.from_payload", return_value=loaded_project):
             app.open_project()
 
         self.assertIs(volumes[1], app.active_series_volume)
@@ -364,7 +364,7 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         app.refresh_series_list = lambda: setattr(app, "series_refreshed", True)
         app.refresh_workspace_status = lambda: setattr(app, "workspace_refreshed", True)
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.messagebox.showwarning"):
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.messagebox.showwarning"):
             app.validate_series()
 
         self.assertTrue(app.series_refreshed)
@@ -383,7 +383,7 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         app.refresh_series_list = lambda: None
         app.refresh_workspace_status = lambda: None
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.messagebox.showwarning") as showwarning:
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.messagebox.showwarning") as showwarning:
             app.validate_series()
 
         showwarning.assert_called_once()

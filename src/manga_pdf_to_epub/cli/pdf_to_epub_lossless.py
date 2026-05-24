@@ -6,13 +6,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .epub_layout_model import LayoutModel
-from .epub_naming import generated_volume_title, infer_volume_number
-from .pdf_image_extraction import images_in_pdf_page_order
-from .pdf_image_types import ImageStream, PdfImageError
-from .epub_page_factory import page_from_image
-from .epub_validation import validate_epub_structure
-from .epub_writer import EpubPage, media_type_for_ext, write_epub_from_pages
+from ..models.layout import LayoutModel
+from ..epub.naming import generated_volume_title, infer_volume_number
+from ..pdf.image_extraction import images_in_pdf_page_order
+from ..pdf.image_types import ImageStream, PdfImageError
+from ..epub.page_factory import page_from_image
+from ..epub.validation import validate_epub_structure
+from ..epub.writer import EpubPage, media_type_for_ext, write_epub_from_pages
 
 
 _validate_epub_structure = validate_epub_structure

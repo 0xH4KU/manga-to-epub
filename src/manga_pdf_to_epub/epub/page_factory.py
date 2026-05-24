@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from .epub_writer import EpubPage, media_type_for_ext
-from .pdf_image_types import ImageStream
-from .pdf_png import image_to_epub_member
+from .writer import EpubPage, media_type_for_ext
+from ..pdf.image_types import ImageStream
+from ..pdf.png import image_to_epub_member
 
 
 def page_from_image(image: ImageStream, padding: int, load_payload: bool = True) -> tuple[EpubPage, str]:

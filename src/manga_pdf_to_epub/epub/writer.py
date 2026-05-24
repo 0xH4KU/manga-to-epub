@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Callable
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
-from .epub_validation import validate_epub_structure
-from .pdf_image_types import PdfImageError
+from .validation import validate_epub_structure
+from ..pdf.image_types import PdfImageError
 
 
 @dataclass(frozen=True)

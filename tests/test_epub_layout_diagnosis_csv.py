@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from manga_pdf_to_epub.epub_layout_diagnosis import (
+from manga_pdf_to_epub.gui.layout_diagnosis import (
     read_insert_candidates_csv,
     read_spread_candidates_csv,
     reviewable_insert_candidates,

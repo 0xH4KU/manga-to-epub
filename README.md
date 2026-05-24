@@ -54,6 +54,7 @@ The equivalent manual setup is:
 python3 -m venv .venv
 .venv/bin/python -m pip install -U pip
 .venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -e .
 ```
 
 ## GUI Workflow
@@ -61,7 +62,7 @@ python3 -m venv .venv
 Launch the layout editor:
 
 ```bash
-.venv/bin/python epub_layout_gui.py
+.venv/bin/epub-layout-gui
 ```
 
 Typical single-volume Apple Books manga workflow:
@@ -138,13 +139,13 @@ Version 1 presets from earlier builds still load. When a v2 preset references an
 Convert PDF files to fixed-layout EPUB:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" --overwrite
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" --overwrite
 ```
 
 Insert one real blank page before the cover:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
   --blank-pages-before-cover 1 \
   --overwrite
 ```
@@ -152,7 +153,7 @@ Insert one real blank page before the cover:
 Export multiple PDFs into a directory:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py *.pdf \
+.venv/bin/pdf-to-epub-lossless *.pdf \
   --output-dir ./epub-output \
   --overwrite
 ```
@@ -160,7 +161,7 @@ Export multiple PDFs into a directory:
 Set EPUB metadata and use source page 2 as cover art only:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
   --title "Series Vol.01" \
   --author "Author Name" \
   --language ja \
@@ -172,7 +173,7 @@ Set EPUB metadata and use source page 2 as cover art only:
 Apply a GUI layout preset or quick-delete pages without opening the GUI:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
   --preset ./layout-preset.json \
   --delete-range 1-3 \
   --overwrite
@@ -181,7 +182,7 @@ Apply a GUI layout preset or quick-delete pages without opening the GUI:
 Inserted images use `POSITION=PATH` with 1-based spine positions:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 01.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
   --insert-image-after 1=./cover.png \
   --overwrite
 ```
@@ -189,7 +190,7 @@ Inserted images use `POSITION=PATH` with 1-based spine positions:
 For series-style generated titles, use `--series-title` with either `--volume-number` or a filename that contains a volume number:
 
 ```bash
-.venv/bin/python pdf_to_epub_lossless.py "Volume 07.pdf" \
+.venv/bin/pdf-to-epub-lossless "Volume 07.pdf" \
   --series-title "Series Title" \
   --volume-number 7 \
   --overwrite
@@ -217,10 +218,13 @@ For Flate-compressed PDF image streams, the tool wraps the image data into PNG. 
 
 ## Project Files
 
-- `src/manga_pdf_to_epub/` - installable Python package with the converter, PDF image extraction, models, writer, validation, and GUI implementation.
-- `pdf_to_epub_lossless.py`, `epub_layout_gui.py` - compatibility wrappers for direct script usage from the repo root.
-- `src/manga_pdf_to_epub/epub_layout_series_workflow.py` - GUI-facing series export preflight helpers.
-- `src/manga_pdf_to_epub/epub_batch_model.py` - deprecated legacy batch project queue retained for tests and migration only; use `SeriesProject` for new workflow work.
+- `src/manga_pdf_to_epub/` - installable package grouped into `pdf/`, `epub/`, `models/`, `gui/`, and `cli/` subpackages.
+- `src/manga_pdf_to_epub/pdf/` - PDF image discovery, object parsing, image stream types, and PNG wrapping.
+- `src/manga_pdf_to_epub/epub/` - EPUB page construction, writing, naming, and validation.
+- `src/manga_pdf_to_epub/models/` - layout, series, and deprecated batch project models.
+- `src/manga_pdf_to_epub/gui/` - Tkinter layout editor, diagnosis window, preview helpers, and series GUI workflow.
+- `src/manga_pdf_to_epub/cli/` - command-line entrypoints.
+- `scripts/` - compatibility wrappers for direct script usage during development; installed commands live in `.venv/bin/` after setup.
 - `tests/` - unit tests for conversion, layout, series workflows, GUI behavior, and project guardrails.
 
 ## Test

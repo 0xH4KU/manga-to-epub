@@ -5,8 +5,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .epub_layout_model import LayoutModel
-from .epub_naming import generated_volume_title, infer_volume_number, safe_filename
+from .layout import LayoutModel
+from ..epub.naming import generated_volume_title, infer_volume_number, safe_filename
 
 
 @dataclass

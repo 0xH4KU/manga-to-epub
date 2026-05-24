@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from zipfile import ZipFile
 
-from manga_pdf_to_epub.epub_series_model import SeriesProject, SeriesVolume
+from manga_pdf_to_epub.models.series import SeriesProject, SeriesVolume
 from tests.helpers import four_page_pdf, tiny_png
 from tests.helpers import two_page_pdf_with_late_cover
 

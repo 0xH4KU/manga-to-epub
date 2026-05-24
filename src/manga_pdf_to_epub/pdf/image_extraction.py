@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Callable
 
-from .pdf_image_types import ImageStream, PdfImageError
+from .image_types import ImageStream, PdfImageError
 
 
 def images_in_pdf_page_order(pdf_path: Path, load_payloads: bool = True) -> list[ImageStream]:

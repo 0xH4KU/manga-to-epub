@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from manga_pdf_to_epub.epub_layout_diagnosis import (
+from manga_pdf_to_epub.gui.layout_diagnosis import (
     SpreadCandidate,
     diagnose_spread_damage,
     source_preview_placements,

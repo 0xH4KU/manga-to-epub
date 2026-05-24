@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from manga_pdf_to_epub.pdf_image_extraction import _image_from_xref, images_in_pdf_page_order
-from manga_pdf_to_epub.pdf_image_types import PdfImageError
-from manga_pdf_to_epub.pdf_png import flate_image_to_png
+from manga_pdf_to_epub.pdf.image_extraction import _image_from_xref, images_in_pdf_page_order
+from manga_pdf_to_epub.pdf.image_types import PdfImageError
+from manga_pdf_to_epub.pdf.png import flate_image_to_png
 from tests.helpers import pdf_from_objects, png_predict_none, stream_object, two_page_pdf_with_late_cover
 
 
@@ -29,7 +29,7 @@ class PdfImageExtractionTests(unittest.TestCase):
             pdf_path = Path(tmp) / "comic.pdf"
             pdf_path.write_bytes(two_page_pdf_with_late_cover())
 
-            with patch("manga_pdf_to_epub.pdf_image_extraction._load_fitz", return_value=None):
+            with patch("manga_pdf_to_epub.pdf.image_extraction._load_fitz", return_value=None):
                 with self.assertRaisesRegex(PdfImageError, "PyMuPDF is required"):
                     images_in_pdf_page_order(pdf_path)
 

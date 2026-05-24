@@ -8,25 +8,25 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .fitz_compat import load_fitz
-from .epub_layout_commands import app_commands
-from .epub_layout_diagnosis_controller import (
+from ..fitz_compat import load_fitz
+from .layout_commands import app_commands
+from .layout_diagnosis_controller import (
     EpubLayoutDiagnosisMixin,
     build_diagnosis_entry_tab,
     initialize_diagnosis_state,
     reset_diagnosis_for_model,
 )
-from .epub_layout_series_controller import EpubLayoutSeriesMixin
-from .epub_layout_history import CoverState, DeleteHistory
-from .epub_layout_model import LayoutEntry, LayoutModel
-from .epub_layout_gui_support import (
+from .layout_series_controller import EpubLayoutSeriesMixin
+from .layout_history import CoverState, DeleteHistory
+from ..models.layout import LayoutEntry, LayoutModel
+from .layout_support import (
     AppCommand,
     PlainTextVariable,
     VirtualBlank,
     delete_status,
     event_from_text_input,
 )
-from .epub_layout_preview import (
+from .layout_preview import (
     ThumbnailCache,
     normalize_preview_size,
     preview_entries,

@@ -1,6 +1,6 @@
 import unittest
 
-from manga_pdf_to_epub.epub_layout_history import CoverState, DeleteHistory
+from manga_pdf_to_epub.gui.layout_history import CoverState, DeleteHistory
 
 
 class EpubLayoutHistoryTests(unittest.TestCase):

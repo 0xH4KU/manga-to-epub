@@ -5,8 +5,8 @@ import re
 import struct
 import zlib
 
-from .pdf_image_types import ImageStream, PdfImageError
-from .pdf_object_parser import decode_pdf_literal_string, extract_int
+from .image_types import ImageStream, PdfImageError
+from .object_parser import decode_pdf_literal_string, extract_int
 
 
 def image_to_epub_member(image: ImageStream) -> tuple[str, bytes]:

@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
 
-from manga_pdf_to_epub.epub_layout_gui import EpubLayoutApp
+from manga_pdf_to_epub.gui.layout_app import EpubLayoutApp
 
 from tests.gui_helpers import (
     FakeDeleteModel,
@@ -162,7 +162,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app._busy = False
         app.done_value = None
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.threading.Thread") as thread:
+        with patch("manga_pdf_to_epub.gui.layout_app.threading.Thread") as thread:
             thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
             started = app._run_background("Working...", lambda: 42, lambda value: setattr(app, "done_value", value))
 
@@ -177,7 +177,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app.status = FakeStatus()
         app._busy = False
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.threading.Thread") as thread:
+        with patch("manga_pdf_to_epub.gui.layout_app.threading.Thread") as thread:
             thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
             started = app._run_background(
                 "Working...",
@@ -198,7 +198,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         queued = []
         app.root.after = lambda delay, callback: queued.append(callback)
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.threading.Thread") as thread:
+        with patch("manga_pdf_to_epub.gui.layout_app.threading.Thread") as thread:
             thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
             app._run_background(
                 "Working...",
@@ -226,7 +226,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app._run_background = lambda status, work, on_success: setattr(app, "background_call", (status, work, on_success)) or True
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.filedialog.askopenfilename", return_value="/tmp/book.pdf"):
+        with patch("manga_pdf_to_epub.gui.layout_app.filedialog.askopenfilename", return_value="/tmp/book.pdf"):
             app.open_pdf()
 
         self.assertEqual(Path("/tmp/book.pdf"), app.pdf_path)
@@ -257,7 +257,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app._pdf_doc = FakeDoc()
         app._pdf_doc_path = app.pdf_path
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.tk.PhotoImage", return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20)) as photo:
+        with patch("manga_pdf_to_epub.gui.layout_app.tk.PhotoImage", return_value=SimpleNamespace(width=lambda: 10, height=lambda: 20)) as photo:
             first = app._thumbnail_for_page(1, 120, 180)
             second = app._thumbnail_for_page(1, 121, 181)
 
@@ -287,7 +287,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
         photo_image = object()
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.tk.PhotoImage", return_value=photo_image) as photo:
+        with patch("manga_pdf_to_epub.gui.layout_app.tk.PhotoImage", return_value=photo_image) as photo:
             app._thumbnail_render_done(("pdf", 1, 100, 150), Path("/tmp/book.pdf"), 2, b"PNG", None)
 
         photo.assert_called_once_with(data=b"PNG")

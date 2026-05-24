@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from manga_pdf_to_epub.pdf_object_parser import iter_image_streams
+from manga_pdf_to_epub.pdf.object_parser import iter_image_streams
 from tests.helpers import minimal_pdf, png_predict_none
 
 

@@ -2,8 +2,8 @@ import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
 
-from manga_pdf_to_epub.epub_layout_gui import EpubLayoutApp
-from manga_pdf_to_epub.epub_layout_history import CoverState, DeleteHistory
+from manga_pdf_to_epub.gui.layout_app import EpubLayoutApp
+from manga_pdf_to_epub.gui.layout_history import CoverState, DeleteHistory
 
 from tests.gui_helpers import (
     FakeDeleteModel,
@@ -162,7 +162,7 @@ class EpubLayoutGuiEditingTests(unittest.TestCase):
         app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
         app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.messagebox.askyesno", return_value=True) as askyesno:
+        with patch("manga_pdf_to_epub.gui.layout_app.messagebox.askyesno", return_value=True) as askyesno:
             app.delete_selected_entry()
 
         askyesno.assert_called_once()
@@ -218,7 +218,7 @@ class EpubLayoutGuiEditingTests(unittest.TestCase):
         app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
         app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.messagebox.askyesno", return_value=True):
+        with patch("manga_pdf_to_epub.gui.layout_app.messagebox.askyesno", return_value=True):
             app.quick_delete_first(2)
 
         self.assertEqual(["Page 3"], [entry.label for entry in app.model.entries])
@@ -236,7 +236,7 @@ class EpubLayoutGuiEditingTests(unittest.TestCase):
         app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
         app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.messagebox.askyesno", return_value=False):
+        with patch("manga_pdf_to_epub.gui.layout_app.messagebox.askyesno", return_value=False):
             app.quick_delete_first(2)
 
         self.assertEqual(["Page 1", "Page 2", "Page 3"], [entry.label for entry in app.model.entries])
@@ -314,7 +314,7 @@ class EpubLayoutGuiEditingTests(unittest.TestCase):
         app.status = FakeStatus()
         app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.messagebox.showerror") as showerror:
+        with patch("manga_pdf_to_epub.gui.layout_app.messagebox.showerror") as showerror:
             app.set_selected_as_cover()
 
         showerror.assert_called_once_with("Set cover failed", "Cover must be an image page.")
@@ -390,7 +390,7 @@ class EpubLayoutGuiEditingTests(unittest.TestCase):
         app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
         app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.filedialog.askopenfilename", return_value="/tmp/extra.png"):
+        with patch("manga_pdf_to_epub.gui.layout_app.filedialog.askopenfilename", return_value="/tmp/extra.png"):
             app.insert_image(before=False)
 
         self.assertEqual(["Page 1", "Image 2"], [entry.label for entry in app.model.entries])
@@ -419,7 +419,7 @@ class EpubLayoutGuiEditingTests(unittest.TestCase):
         app.refresh_list = lambda preserve_yview=False: setattr(app, "preserved_yview", preserve_yview)
         app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
 
-        with patch("manga_pdf_to_epub.epub_layout_gui.messagebox.askyesno", return_value=True):
+        with patch("manga_pdf_to_epub.gui.layout_app.messagebox.askyesno", return_value=True):
             app.quick_delete_first(2)
 
         self.assertEqual("Deleted 2 entries: 1 image, 1 blank.", app.status.value)

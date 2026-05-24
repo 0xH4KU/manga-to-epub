@@ -5,7 +5,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .epub_layout_diagnosis import (
+from .layout_diagnosis import (
     DiagnosisSession,
     InsertCandidate,
     SpreadCandidate,
@@ -14,8 +14,8 @@ from .epub_layout_diagnosis import (
     read_insert_candidates_csv,
     read_spread_candidates_csv,
 )
-from .epub_layout_diagnosis_gui import DiagnosisPanel, DiagnosisPanelCallbacks, DiagnosisWindow, diagnosis_summary_texts
-from .epub_layout_diagnosis_runner import (
+from .layout_diagnosis_window import DiagnosisPanel, DiagnosisPanelCallbacks, DiagnosisWindow, diagnosis_summary_texts
+from .layout_diagnosis_runner import (
     DiagnosisSettings,
     default_diagnosis_output_dir,
     resolve_insert_score_command,

@@ -2,8 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from manga_pdf_to_epub.epub_layout_series_workflow import series_export_preflight
-from manga_pdf_to_epub.epub_series_model import SeriesProject
+from manga_pdf_to_epub.gui.layout_series_workflow import series_export_preflight
+from manga_pdf_to_epub.models.series import SeriesProject
 from tests.helpers import two_page_pdf_with_late_cover
 
 

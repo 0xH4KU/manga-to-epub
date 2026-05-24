@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from manga_pdf_to_epub.epub_naming import generated_volume_title, infer_volume_number, safe_filename
+from manga_pdf_to_epub.epub.naming import generated_volume_title, infer_volume_number, safe_filename
 
 
 class EpubNamingTests(unittest.TestCase):

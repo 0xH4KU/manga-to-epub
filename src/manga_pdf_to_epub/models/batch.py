@@ -4,7 +4,7 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .epub_layout_model import LayoutModel
+from .layout import LayoutModel
 
 
 @dataclass

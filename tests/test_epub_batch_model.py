@@ -4,8 +4,8 @@ import json
 import warnings
 from pathlib import Path
 
-from manga_pdf_to_epub.epub_batch_model import BatchProject
-from manga_pdf_to_epub.epub_layout_model import LayoutModel
+from manga_pdf_to_epub.models.batch import BatchProject
+from manga_pdf_to_epub.models.layout import LayoutModel
 from tests.helpers import four_page_pdf, tiny_png
 from tests.helpers import two_page_pdf_with_late_cover
 

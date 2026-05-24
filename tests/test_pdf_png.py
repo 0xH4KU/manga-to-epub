@@ -5,9 +5,9 @@ import unittest
 import zlib
 from pathlib import Path
 
-from manga_pdf_to_epub.pdf_image_types import ImageStream
-from manga_pdf_to_epub.pdf_object_parser import iter_image_streams
-from manga_pdf_to_epub.pdf_png import flate_image_to_png, image_to_epub_member
+from manga_pdf_to_epub.pdf.image_types import ImageStream
+from manga_pdf_to_epub.pdf.object_parser import iter_image_streams
+from manga_pdf_to_epub.pdf.png import flate_image_to_png, image_to_epub_member
 from tests.helpers import minimal_pdf, png_predict_none
 
 

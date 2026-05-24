@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
 
-from manga_pdf_to_epub.epub_layout_gui import EpubLayoutApp
+from manga_pdf_to_epub.gui.layout_app import EpubLayoutApp
 
 from tests.gui_helpers import (
     FakeDeleteModel,
@@ -27,7 +27,7 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         app.refresh_workspace_status = lambda: None
 
         with patch(
-            "manga_pdf_to_epub.epub_layout_series_controller.filedialog.askopenfilenames",
+            "manga_pdf_to_epub.gui.layout_series_controller.filedialog.askopenfilenames",
             return_value=("/tmp/[晚安,布布][淺野一二O] Vol.02.pdf", "/tmp/[晚安,布布][淺野一二O] Vol.01.pdf"),
         ):
             app.import_series()
@@ -46,7 +46,7 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         app.refresh_workspace_status = lambda: None
 
         with patch(
-            "manga_pdf_to_epub.epub_layout_series_controller.filedialog.askopenfilenames",
+            "manga_pdf_to_epub.gui.layout_series_controller.filedialog.askopenfilenames",
             return_value=("/tmp/[晚安,布布][淺野一二O] Vol.02.pdf", "/tmp/[晚安,布布][淺野一二O] Vol.01.pdf"),
         ):
             app.import_series()
@@ -301,7 +301,7 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         app.series_project = project
         app._run_background = lambda _status, work, on_success: on_success(work()) or True
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
             app.export_ready_series()
 
         self.assertEqual(Path("/tmp/out"), project.exported_to)
@@ -324,7 +324,7 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         app.series_project = project
         app._run_background = lambda status, work, on_success: setattr(app, "background_call", (status, work, on_success)) or True
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
             app.export_ready_series()
 
         self.assertEqual("Exporting ready series...", app.background_call[0])
@@ -351,7 +351,7 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         app.series_project = project
         app._run_background = lambda status, work, on_success: setattr(app, "background_call", (status, work, on_success)) or True
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
             app.export_ready_series()
 
         summary = app.background_call[1]()
@@ -374,7 +374,7 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         )
         app._run_background = lambda status, work, on_success: setattr(app, "background_call", (status, work, on_success)) or True
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
             app.export_ready_series()
 
         self.assertEqual("Exporting ready series...", app.series_export_progress["current"])
@@ -398,7 +398,7 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         app.series_project = SimpleNamespace(export_ready_iter=lambda output_dir: iter([]))
         app._busy = True
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
             app.export_ready_series()
 
         self.assertEqual("Another operation is already running.", app.status.value)
@@ -418,8 +418,8 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         app._run_background = lambda status, work, on_success: setattr(app, "background_call", (status, work, on_success)) or True
         app._open_series_export_progress = lambda: setattr(app, "progress_opened", True)
 
-        with patch("manga_pdf_to_epub.epub_layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
-            with patch("manga_pdf_to_epub.epub_layout_series_controller.messagebox.showwarning") as showwarning:
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
+            with patch("manga_pdf_to_epub.gui.layout_series_controller.messagebox.showwarning") as showwarning:
                 app.export_ready_series()
 
         showwarning.assert_called_once()

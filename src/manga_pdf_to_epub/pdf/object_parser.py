@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .pdf_image_types import ImageStream, PdfImageError
+from .image_types import ImageStream, PdfImageError
 
 
 def _find_dict_bounds(data: bytes, stream_pos: int) -> tuple[int, int] | None:
