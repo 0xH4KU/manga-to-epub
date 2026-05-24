@@ -12,7 +12,14 @@ class ProjectGuardrailTests(unittest.TestCase):
     def test_gui_app_class_stays_below_current_complexity_ceiling(self):
         tree = ast.parse(Path("src/manga_pdf_to_epub/epub_layout_gui.py").read_text(encoding="utf-8"))
         app_class = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "EpubLayoutApp")
-        self.assertLessEqual(app_class.end_lineno - app_class.lineno + 1, 1450)
+        self.assertLessEqual(app_class.end_lineno - app_class.lineno + 1, 1200)
+
+    def test_gui_series_workflow_lives_in_dedicated_controller(self):
+        source = Path("src/manga_pdf_to_epub/epub_layout_gui.py").read_text(encoding="utf-8")
+        controller = Path("src/manga_pdf_to_epub/epub_layout_series_controller.py")
+
+        self.assertTrue(controller.exists())
+        self.assertIn("from .epub_layout_series_controller import EpubLayoutSeriesMixin", source)
 
     def test_gui_behavior_tests_stay_split_by_workflow(self):
         test_files = [

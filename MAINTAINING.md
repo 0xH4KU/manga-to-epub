@@ -12,6 +12,7 @@ This project should stay small, explicit, and workflow-driven. When adding behav
 - Keep layout state, presets, and export glue in `src/manga_pdf_to_epub/epub_layout_model.py`.
 - Keep series status, validation, and export policy in `src/manga_pdf_to_epub/epub_series_model.py`.
 - Keep GUI preflight/workflow helpers in focused modules such as `src/manga_pdf_to_epub/epub_layout_series_workflow.py`.
+- Keep GUI series/project event wiring in `src/manga_pdf_to_epub/epub_layout_series_controller.py`.
 - Keep GUI-only event wiring in `src/manga_pdf_to_epub/epub_layout_gui.py`.
 - Keep tests in `tests/`; shared test fixtures belong in `tests/helpers.py` or `tests/gui_helpers.py`.
 - Avoid adding optional export formats unless they justify their ongoing maintenance cost.
