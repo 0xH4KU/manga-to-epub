@@ -2,10 +2,14 @@ import io
 import json
 import tempfile
 import unittest
+import warnings
+from io import BytesIO
 from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 from contextlib import redirect_stderr
 from unittest.mock import patch
+
+from PIL import Image
 
 from manga_pdf_to_epub.pdf.image_types import PdfImageError
 from manga_pdf_to_epub.cli.pdf_to_epub_lossless import (
@@ -21,6 +25,59 @@ from tests.helpers import two_page_pdf_with_late_cover
 
 
 class PdfToEpubLosslessTests(unittest.TestCase):
+    def test_cli_converts_cbz_archive_to_epub(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cbz_path = Path(tmp) / "comic.cbz"
+            output_dir = Path(tmp) / "out"
+            with ZipFile(cbz_path, "w") as archive:
+                archive.writestr("page-2.webp", _sample_image("WEBP", (2, 3)))
+                archive.writestr("page-1.png", tiny_png())
+
+            with patch(
+                "sys.argv",
+                [
+                    "pdf_to_epub_lossless.py",
+                    str(cbz_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--overwrite",
+                ],
+            ):
+                self.assertEqual(0, main())
+
+            with ZipFile(output_dir / "comic.epub") as archive:
+                self.assertEqual(tiny_png(), archive.read("EPUB/images/page-0001.png"))
+                self.assertTrue(archive.read("EPUB/images/page-0002.png").startswith(b"\x89PNG\r\n\x1a\n"))
+
+    def test_cli_layout_operations_accept_zip_archive_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            zip_path = Path(tmp) / "comic.zip"
+            output_dir = Path(tmp) / "out"
+            with ZipFile(zip_path, "w") as archive:
+                archive.writestr("page-1.png", tiny_png())
+                archive.writestr("page-2.png", tiny_png())
+                archive.writestr("page-3.png", tiny_png())
+
+            with patch(
+                "sys.argv",
+                [
+                    "pdf_to_epub_lossless.py",
+                    str(zip_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--delete-range",
+                    "1-2",
+                    "--overwrite",
+                ],
+            ):
+                self.assertEqual(0, main())
+
+            with ZipFile(output_dir / "comic.epub") as archive:
+                self.assertIn("EPUB/images/page-0001.png", archive.namelist())
+                self.assertNotIn("EPUB/images/page-0003.png", archive.namelist())
+                nav = archive.read("EPUB/nav.xhtml").decode("utf-8")
+                self.assertIn("page-3", nav)
+
     def test_epub_uses_pdf_page_order_and_marks_first_image_as_cover(self):
         cover = b"\xff\xd8COVER\xff\xd9"
         page2 = b"\xff\xd8PAGE2\xff\xd9"
@@ -505,8 +562,10 @@ class PdfToEpubLosslessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             epub_path = Path(tmp) / "broken.epub"
             with ZipFile(epub_path, "w") as archive:
-                archive.writestr("mimetype", b"application/epub+zip")
-                archive.writestr("mimetype", b"application/epub+zip")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UserWarning)
+                    archive.writestr("mimetype", b"application/epub+zip")
+                    archive.writestr("mimetype", b"application/epub+zip")
 
             with self.assertRaisesRegex(PdfImageError, "Duplicate EPUB zip entry: mimetype"):
                 _validate_epub_structure(epub_path)
@@ -714,3 +773,10 @@ class PdfToEpubLosslessTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _sample_image(fmt: str, size: tuple[int, int]) -> bytes:
+    image = Image.new("RGB", size, (0, 128, 255))
+    output = BytesIO()
+    image.save(output, format=fmt)
+    return output.getvalue()

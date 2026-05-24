@@ -10,6 +10,7 @@ from ..pdf.image_extraction import images_in_pdf_page_order
 from ..pdf.image_types import ImageStream, PdfImageError
 from ..epub.page_factory import page_from_image
 from ..epub.writer import EpubPage, media_type_for_ext, write_epub_from_pages
+from ..sources.archive import ArchiveImage, archive_images_in_page_order
 
 
 fitz = load_fitz()
@@ -54,9 +55,29 @@ class LayoutModel:
 
     @classmethod
     def from_pdf(cls, pdf_path: Path) -> "LayoutModel":
+        return cls.from_source(pdf_path)
+
+    @classmethod
+    def from_source(cls, source_path: Path) -> "LayoutModel":
+        source_path = Path(source_path)
+        suffix = source_path.suffix.lower()
+        if suffix == ".pdf":
+            return cls._from_pdf_source(source_path)
+        if suffix in {".cbz", ".zip"}:
+            return cls._from_archive_source(source_path)
+        raise PdfImageError(f"Unsupported source file: {source_path}")
+
+    @classmethod
+    def _from_pdf_source(cls, pdf_path: Path) -> "LayoutModel":
         images = images_in_pdf_page_order(pdf_path, load_payloads=False)
         entries = [_entry_from_image(image, max(4, len(str(len(images))))) for image in images]
         return cls(pdf_path, entries, source_page_count=len(images))
+
+    @classmethod
+    def _from_archive_source(cls, archive_path: Path) -> "LayoutModel":
+        images = archive_images_in_page_order(archive_path, load_payloads=False)
+        entries = [_entry_from_archive_image(image, max(4, len(str(len(images))))) for image in images]
+        return cls(archive_path, entries, source_page_count=len(images))
 
     def insert_blank(self, index: int) -> None:
         if index < 0 or index > len(self.entries):
@@ -273,6 +294,8 @@ class LayoutModel:
     def _apply_v2_preset(self, payload: dict) -> None:
         source_entries = {entry.source_index: entry for entry in self.entries if entry.source_index is not None}
         original_entries = list(self.entries)
+        template_source_count = _preset_source_page_count(payload)
+        applied_source_indexes: set[int] = set()
         self.entries = []
         self._blank_counter = 0
         self._external_image_counter = 0
@@ -283,6 +306,7 @@ class LayoutModel:
                 entry = source_entries.get(source_index)
                 if entry is not None:
                     self.entries.append(entry)
+                    applied_source_indexes.add(int(source_index))
                 continue
             if kind == "blank":
                 if self.entries:
@@ -297,6 +321,13 @@ class LayoutModel:
                 self.insert_image(len(self.entries), image_path, item_id=item.get("entry_id"))
                 continue
             raise ValueError(f"Unsupported preset entry kind: {kind}")
+        self.entries.extend(
+            entry
+            for entry in original_entries
+            if entry.source_index is not None
+            and entry.source_index > template_source_count
+            and entry.source_index not in applied_source_indexes
+        )
 
         metadata = payload.get("metadata", {})
         self.title = metadata.get("title") or self.source_path.stem
@@ -415,6 +446,23 @@ def _entry_from_image(image: ImageStream, padding: int) -> LayoutEntry:
     return LayoutEntry(page.label, page, source_index=image.index)
 
 
+def _entry_from_archive_image(image: ArchiveImage, padding: int) -> LayoutEntry:
+    page_number = f"{image.index:0{padding}d}"
+    page = EpubPage(
+        index=image.index,
+        width=image.width,
+        height=image.height,
+        image_href=f"images/page-{page_number}.{image.epub_ext}",
+        image_media_type=media_type_for_ext(image.epub_ext),
+        image_data=None,
+        xhtml_href=f"xhtml/page-{page_number}.xhtml",
+        item_id=f"page-{image.index:04d}",
+        label=image.label,
+        image_data_loader=image.load_data,
+    )
+    return LayoutEntry(image.label, page, source_index=image.source_index)
+
+
 def _inserted_item_number(item_id: str | None) -> int | None:
     prefix = "inserted-"
     if item_id is None or not item_id.startswith(prefix):
@@ -423,6 +471,20 @@ def _inserted_item_number(item_id: str | None) -> int | None:
     if not number_text.isdigit():
         return None
     return int(number_text)
+
+
+def _preset_source_page_count(payload: dict) -> int:
+    count = payload.get("source_page_count")
+    if isinstance(count, int):
+        return count
+    if isinstance(count, str) and count.isdigit():
+        return int(count)
+    source_indexes = [
+        item.get("source_index")
+        for item in payload.get("entries", [])
+        if item.get("kind") == "source" and isinstance(item.get("source_index"), int)
+    ]
+    return max(source_indexes, default=0)
 
 
 def _reference_page(entries: list[LayoutEntry], index: int) -> EpubPage:

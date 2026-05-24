@@ -63,6 +63,26 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         )
         self.assertEqual("Imported series with 2 volumes.", app.status.value)
 
+    def test_import_series_accepts_pdf_cbz_and_zip_sources(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.series_list = FakeListbox(selection=0)
+        app.series_pane = FakeWidget()
+        app.spine_pane = FakeWidget()
+        app.status = FakeStatus()
+        app.workspace_status = FakeStatus()
+        app._load_metadata_fields = lambda: None
+        app.refresh_workspace_status = lambda: None
+
+        with patch(
+            "manga_pdf_to_epub.gui.layout_series_controller.filedialog.askopenfilenames",
+            return_value=("/tmp/Series Vol.01.cbz", "/tmp/Series Vol.02.zip"),
+        ) as dialog:
+            app.import_series()
+
+        self.assertEqual([Path("/tmp/Series Vol.01.cbz"), Path("/tmp/Series Vol.02.zip")], [volume.pdf_path for volume in app.series_project.volumes])
+        self.assertEqual("Import Series Sources", dialog.call_args.kwargs["title"])
+        self.assertIn("*.pdf *.cbz *.zip", dialog.call_args.kwargs["filetypes"][0][1])
+
     def test_select_series_volume_loads_existing_editor_model(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         first = SimpleNamespace(
@@ -308,6 +328,27 @@ class EpubLayoutGuiSeriesTests(unittest.TestCase):
         self.assertTrue(app.series_refreshed)
         self.assertTrue(app.workspace_refreshed)
         self.assertEqual("Series exported 1 volumes; 0 failed, 2 skipped, 3 warnings.", app.status.value)
+
+    def test_export_ready_series_stores_metadata_fields_before_exporting(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.status = FakeStatus()
+        app.refresh_series_list = lambda: None
+        app.refresh_workspace_status = lambda: None
+        app.root = FakeRoot()
+        events = [{"status": "summary", "exported": 0, "failed": 0, "skipped": 0, "warnings": 0}]
+        project = SimpleNamespace(
+            volumes=[],
+            validate_ready=lambda output_dir: {"ready": 0, "failed": 0, "warnings": 0},
+            export_ready_iter=lambda output_dir: iter(events),
+        )
+        app.series_project = project
+        app._store_metadata_fields = lambda: setattr(app, "metadata_stored", True)
+        app._run_background = lambda _status, work, on_success: on_success(work()) or True
+
+        with patch("manga_pdf_to_epub.gui.layout_series_controller.filedialog.askdirectory", return_value="/tmp/out"):
+            app.export_ready_series()
+
+        self.assertTrue(app.metadata_stored)
 
     def test_export_ready_series_runs_in_background(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)

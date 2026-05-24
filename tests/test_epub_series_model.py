@@ -1,7 +1,10 @@
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
+
+from PIL import Image
 
 from manga_pdf_to_epub.models.series import SeriesProject, SeriesVolume
 from tests.helpers import four_page_pdf, tiny_png
@@ -9,6 +12,18 @@ from tests.helpers import two_page_pdf_with_late_cover
 
 
 class EpubSeriesModelTests(unittest.TestCase):
+    def test_import_sources_loads_cbz_volume_model(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cbz_path = Path(tmp) / "Series Vol.01.cbz"
+            with ZipFile(cbz_path, "w") as archive:
+                archive.writestr("page-1.webp", _sample_image("WEBP", (2, 3)))
+
+            project = SeriesProject.from_sources([cbz_path], title="Series")
+            model = project.model_for_volume(project.volumes[0])
+
+            self.assertEqual("Series Vol.01", project.generated_title(project.volumes[0]))
+            self.assertEqual(["page-1"], [entry.label for entry in model.entries])
+
     def test_import_pdfs_sorts_volumes_and_generates_titles_from_series_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
             vol10 = Path(tmp) / "晚安,布布 淺野一二O Vol.10.pdf"
@@ -293,7 +308,7 @@ class EpubSeriesModelTests(unittest.TestCase):
             self.assertEqual(["Output filename collision: Series Vol.01.epub", "Duplicate volume number: 1"], project.volumes[1].warnings)
             self.assertEqual("Failed", project.volumes[0].status)
             self.assertEqual("Failed", project.volumes[1].status)
-            self.assertIn("Source PDF not found", project.volumes[1].error)
+            self.assertIn("Source file not found", project.volumes[1].error)
 
     def test_validate_ready_reports_missing_inserted_image_on_exact_volume(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -397,6 +412,23 @@ class EpubSeriesModelTests(unittest.TestCase):
             self.assertEqual({"ready": 2, "failed": 0, "warnings": 1}, summary)
             self.assertEqual(["Applied layout image count differs from baseline: 1 != 2"], project.volumes[1].warnings)
 
+    def test_series_preset_application_keeps_pages_beyond_template_source_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first_pdf = Path(tmp) / "Series Vol.01.pdf"
+            second_pdf = Path(tmp) / "Series Vol.02.pdf"
+            first_pdf.write_bytes(two_page_pdf_with_late_cover())
+            second_pdf.write_bytes(four_page_pdf())
+            project = SeriesProject.from_pdfs([first_pdf, second_pdf], title="Series")
+            first_model = project.model_for_volume(project.volumes[0])
+            first_model.delete_entry(1)
+            first_model.insert_blank(1)
+            payload = first_model.to_preset_payload()
+
+            second_model = project.model_for_volume(project.volumes[1])
+            second_model.apply_preset_payload(payload)
+
+            self.assertEqual(["Page 1", "Blank 1", "Page 3", "Page 4"], [entry.label for entry in second_model.entries])
+
     def test_export_ready_refuses_to_overwrite_existing_epub(self):
         with tempfile.TemporaryDirectory() as tmp:
             pdf_path = Path(tmp) / "Series Vol.01.pdf"
@@ -475,7 +507,7 @@ class EpubSeriesModelTests(unittest.TestCase):
             self.assertTrue((output_dir / "Series Vol.01.epub").exists())
             self.assertEqual("Exported", project.volumes[0].status)
             self.assertEqual("Failed", project.volumes[1].status)
-            self.assertIn("Source PDF not found", project.volumes[1].error)
+            self.assertIn("Source file not found", project.volumes[1].error)
 
     def test_export_ready_iter_yields_per_volume_progress_events(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -513,3 +545,10 @@ class EpubSeriesModelTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _sample_image(fmt: str, size: tuple[int, int]) -> bytes:
+    image = Image.new("RGB", size, (0, 255, 128))
+    output = BytesIO()
+    image.save(output, format=fmt)
+    return output.getvalue()

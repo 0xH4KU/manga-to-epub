@@ -1,8 +1,8 @@
-# Manga PDF to EPUB
+# Manga to EPUB
 
-Lossless PDF to EPUB tools for manga readers who care about page pairing, cover gaps, and Apple Books layout quirks.
+Lossless manga-source to EPUB tools for readers who care about page pairing, cover gaps, and Apple Books layout quirks.
 
-This project is not a general-purpose "compress my PDF" converter. It is for fixed-layout manga workflows where the source PDF already contains page images, and the goal is to preserve those images while tuning the reading order for Apple Books.
+This project is not a general-purpose "compress my book" converter. It is for fixed-layout manga workflows where the source is a PDF, CBZ, or ZIP full of page images, and the goal is to preserve those images where possible while tuning the reading order for Apple Books.
 
 ## Why This Exists
 
@@ -10,7 +10,8 @@ Apple Books can add a virtual blank page beside the cover. For manga, that small
 
 This tool focuses on the boring-but-crucial details:
 
-- Preserve original PDF image streams when possible.
+- Import image-based PDF, CBZ, and ZIP sources.
+- Preserve original PDF and archive image bytes when possible.
 - Export EPUB 3 fixed-layout books for right-to-left manga reading.
 - Preview Apple Books' cover-side virtual blank page.
 - Insert or remove real blank pages at arbitrary positions.
@@ -27,8 +28,9 @@ This tool focuses on the boring-but-crucial details:
 
 ## Features
 
-- PDF to EPUB without image recompression for JPEG image streams.
+- PDF, CBZ, and ZIP to EPUB without image recompression for JPEG/PNG archive pages.
 - PDF Flate image streams are wrapped into PNG containers.
+- Archive WebP, BMP, TIFF, GIF, AVIF, HEIC/HEIF, and JPEG 2000 pages are converted to PNG for EPUB compatibility.
 - Tkinter GUI for manual manga layout tuning.
 - Preview-only Apple Books cover-gap mode with a virtual blank page on the right of the first spine item.
 - Arbitrary blank page insertion before or after selected pages.
@@ -44,7 +46,7 @@ This tool focuses on the boring-but-crucial details:
 Use Python 3.11 or newer. Tkinter is included with the standard Python.org macOS installer and most system Python builds.
 
 ```bash
-cd ~/manga-pdf-to-epub
+cd ~/manga-to-epub
 make setup
 ```
 
@@ -67,7 +69,7 @@ Launch the layout editor:
 
 Typical single-volume Apple Books manga workflow:
 
-1. Open a PDF volume.
+1. Open a source volume: PDF, CBZ, or ZIP.
 2. Keep `Preview Apple Books cover gap` enabled.
 3. Inspect spreads in the preview.
 4. Insert blank pages where needed to realign double-page artwork.
@@ -78,7 +80,7 @@ Typical single-volume Apple Books manga workflow:
 9. Insert external JPEG/PNG pages if needed. Inserted pages can be exported as reading pages, selected as cover art, or excluded from reading pages when used as cover-only art.
 10. Export EPUB and import it into Apple Books for final checking.
 
-The GUI normalizes EPUB internals during export. For example, if source pages 1-3 are deleted and the visible list starts with source `Page 4`, the exported EPUB still uses sequential names such as `page-0001.xhtml` and `images/page-0001.jpg`. The visible source labels remain unchanged so you can trace edits back to the original PDF.
+The GUI normalizes EPUB internals during export. For example, if source pages 1-3 are deleted and the visible list starts with source `Page 4`, the exported EPUB still uses sequential names such as `page-0001.xhtml` and `images/page-0001.jpg`. The visible source labels remain unchanged so you can trace edits back to the original source.
 
 ## Diagnosis Workflow
 
@@ -112,7 +114,7 @@ Typical diagnosis pass:
 
 For a manga series:
 
-1. Click `Import Series...` and choose the PDFs for the series.
+1. Click `Import Series...` and choose the PDF, CBZ, or ZIP sources for the series.
 2. Review the `Series volumes` list. Files are naturally sorted, and EPUB titles are generated as `Series Title Vol.xx`.
 3. Select a volume to load it into the existing page editor.
 4. Fix blank pages, deletions, inserted images, and cover choices per volume.
@@ -136,24 +138,30 @@ Version 1 presets from earlier builds still load. When a v2 preset references an
 
 ## Command Line
 
-Convert PDF files to fixed-layout EPUB:
+Convert PDF, CBZ, or ZIP files to fixed-layout EPUB:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" --overwrite
+.venv/bin/manga-to-epub "Volume 01.pdf" --overwrite
 ```
+
+```bash
+.venv/bin/manga-to-epub "Volume 01.cbz" --overwrite
+```
+
+The older `pdf-to-epub-lossless` command remains available as a compatibility alias.
 
 Insert one real blank page before the cover:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
+.venv/bin/manga-to-epub "Volume 01.pdf" \
   --blank-pages-before-cover 1 \
   --overwrite
 ```
 
-Export multiple PDFs into a directory:
+Export multiple sources into a directory:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless *.pdf \
+.venv/bin/manga-to-epub *.pdf *.cbz *.zip \
   --output-dir ./epub-output \
   --overwrite
 ```
@@ -161,7 +169,7 @@ Export multiple PDFs into a directory:
 Set EPUB metadata and use source page 2 as cover art only:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
+.venv/bin/manga-to-epub "Volume 01.pdf" \
   --title "Series Vol.01" \
   --author "Author Name" \
   --language ja \
@@ -173,7 +181,7 @@ Set EPUB metadata and use source page 2 as cover art only:
 Apply a GUI layout preset or quick-delete pages without opening the GUI:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
+.venv/bin/manga-to-epub "Volume 01.pdf" \
   --preset ./layout-preset.json \
   --delete-range 1-3 \
   --overwrite
@@ -182,7 +190,7 @@ Apply a GUI layout preset or quick-delete pages without opening the GUI:
 Inserted images use `POSITION=PATH` with 1-based spine positions:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 01.pdf" \
+.venv/bin/manga-to-epub "Volume 01.pdf" \
   --insert-image-after 1=./cover.png \
   --overwrite
 ```
@@ -190,7 +198,7 @@ Inserted images use `POSITION=PATH` with 1-based spine positions:
 For series-style generated titles, use `--series-title` with either `--volume-number` or a filename that contains a volume number:
 
 ```bash
-.venv/bin/pdf-to-epub-lossless "Volume 07.pdf" \
+.venv/bin/manga-to-epub "Volume 07.pdf" \
   --series-title "Series Title" \
   --volume-number 7 \
   --overwrite
@@ -212,14 +220,17 @@ The OPF modified timestamp is intentionally deterministic so repeated exports ar
 
 ## Lossless Scope
 
-The converter avoids recompressing source artwork where the PDF stores JPEG image streams. Those JPEG bytes are copied directly into the EPUB.
+The converter avoids recompressing source artwork where the PDF stores JPEG image streams or an archive stores JPEG/PNG page files. Those bytes are copied directly into the EPUB.
 
 For Flate-compressed PDF image streams, the tool wraps the image data into PNG. If the PDF uses PNG-style predictors, the compressed rows can be reused inside the PNG container. Unsupported PDF color spaces or filter chains raise an error instead of silently degrading output.
+
+For CBZ/ZIP sources, entries are naturally sorted, common junk files such as `__MACOSX/` and `.DS_Store` are ignored, JPEG/JFIF and PNG/APNG pages are preserved, and WebP/BMP/TIFF/GIF/AVIF/HEIC/HEIF/JPEG 2000 pages are decoded and written as PNG. Animated GIFs and multi-page TIFFs use the first frame/page.
 
 ## Project Files
 
 - `src/manga_pdf_to_epub/` - installable package grouped into `pdf/`, `epub/`, `models/`, `gui/`, and `cli/` subpackages.
 - `src/manga_pdf_to_epub/pdf/` - PDF image discovery, object parsing, image stream types, and PNG wrapping.
+- `src/manga_pdf_to_epub/sources/` - archive source discovery and image normalization for CBZ/ZIP import.
 - `src/manga_pdf_to_epub/epub/` - EPUB page construction, writing, naming, and validation.
 - `src/manga_pdf_to_epub/models/` - layout, series, and deprecated batch project models.
 - `src/manga_pdf_to_epub/gui/` - Tkinter layout editor, diagnosis window, preview helpers, and series GUI workflow.
@@ -241,8 +252,9 @@ make smoke
 
 ## Limitations
 
-- Designed for image-based comic PDFs, not text-first PDFs.
+- Designed for image-based comic PDFs and image archives, not text-first PDFs or general ebooks.
 - Multi-image PDF pages may need more validation.
+- CBR/RAR, MOBI, AZW3, and EPUB import are intentionally out of scope.
 - Apple Books behavior is modeled from observed behavior and should still be checked with real imports.
 - The GUI is intentionally utilitarian; it prioritizes reliable layout correction over visual polish.
 

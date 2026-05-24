@@ -37,7 +37,17 @@ class SeriesProject:
         author: str = "",
         language: str = "zh-Hant",
     ) -> "SeriesProject":
-        sorted_paths = sorted((Path(path) for path in pdf_paths), key=_natural_path_key)
+        return cls.from_sources(pdf_paths, title=title, author=author, language=language)
+
+    @classmethod
+    def from_sources(
+        cls,
+        source_paths: list[Path],
+        title: str | None = None,
+        author: str = "",
+        language: str = "zh-Hant",
+    ) -> "SeriesProject":
+        sorted_paths = sorted((Path(path) for path in source_paths), key=_natural_path_key)
         inferred_title, inferred_author = _infer_series_metadata(sorted_paths)
         volumes = [
             SeriesVolume(pdf_path=path, volume_number=infer_volume_number(path, fallback=index))
@@ -50,7 +60,7 @@ class SeriesProject:
 
     def model_for_volume(self, volume: SeriesVolume) -> LayoutModel:
         if volume.layout_model is None:
-            volume.layout_model = LayoutModel.from_pdf(volume.pdf_path)
+            volume.layout_model = LayoutModel.from_source(volume.pdf_path)
             if volume.layout_payload is not None:
                 volume.layout_model.apply_preset_payload(volume.layout_payload)
                 volume.layout_payload = None
@@ -164,7 +174,7 @@ class SeriesProject:
                 volume.warnings.append(f"Duplicate volume number: {volume.volume_number}")
             if not volume.pdf_path.exists():
                 volume.status = "Failed"
-                volume.error = f"Source PDF not found: {volume.pdf_path}"
+                volume.error = f"Source file not found: {volume.pdf_path}"
             else:
                 self._validate_volume_layout(volume, baseline_page_count)
             if volume.status == "Failed":
@@ -186,7 +196,7 @@ class SeriesProject:
                     return sum(1 for entry in volume.layout_model.entries if not entry.is_blank)
                 if volume.layout_payload is not None:
                     return _payload_image_page_count(volume.layout_payload)
-                return LayoutModel.from_pdf(volume.pdf_path).source_page_count
+                return LayoutModel.from_source(volume.pdf_path).source_page_count
             except Exception:
                 continue
         return None
@@ -220,7 +230,7 @@ class SeriesProject:
                 volume.error = f"Inserted image not found: {path}"
                 raise ValueError(volume.error)
             return _payload_image_page_count(volume.layout_payload)
-        return LayoutModel.from_pdf(volume.pdf_path).source_page_count
+        return LayoutModel.from_source(volume.pdf_path).source_page_count
 
     def _cover_only_would_remove_all_reading_pages(self, volume: SeriesVolume) -> bool:
         if volume.layout_model is not None:

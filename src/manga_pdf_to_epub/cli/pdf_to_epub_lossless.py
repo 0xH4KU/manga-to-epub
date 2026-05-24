@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package PDF page images into fixed-layout EPUB files without re-encoding."""
+"""Package manga source images into fixed-layout EPUB files."""
 
 from __future__ import annotations
 
@@ -33,23 +33,67 @@ def convert_pdf_to_epub(
     cover_item_id: str | None = None,
     exclude_cover_from_reading: bool = False,
 ) -> dict[str, int]:
+    return convert_source_to_epub(
+        pdf_path,
+        epub_path,
+        overwrite=overwrite,
+        title=title,
+        author=author,
+        language=language,
+        apple_books=apple_books,
+        blank_pages_before_cover=blank_pages_before_cover,
+        blank_pages_after_cover=blank_pages_after_cover,
+        pair_first_two_pages=pair_first_two_pages,
+        cover_item_id=cover_item_id,
+        exclude_cover_from_reading=exclude_cover_from_reading,
+    )
+
+
+def convert_source_to_epub(
+    source_path: Path,
+    epub_path: Path,
+    overwrite: bool = False,
+    title: str | None = None,
+    author: str | None = None,
+    language: str = "zh-Hant",
+    apple_books: bool = False,
+    blank_pages_before_cover: int = 0,
+    blank_pages_after_cover: int = 0,
+    pair_first_two_pages: bool = False,
+    cover_item_id: str | None = None,
+    exclude_cover_from_reading: bool = False,
+) -> dict[str, int]:
     if epub_path.exists() and not overwrite:
         raise PdfImageError(f"Refusing to overwrite existing file: {epub_path}")
 
-    images = images_in_pdf_page_order(pdf_path, load_payloads=False)
-    if not images:
-        raise PdfImageError(f"No image streams found in {pdf_path}")
+    if source_path.suffix.lower() == ".pdf":
+        images = images_in_pdf_page_order(source_path, load_payloads=False)
+        if not images:
+            raise PdfImageError(f"No image streams found in {source_path}")
+        pages, counts = _build_pages(
+            images,
+            blank_pages_before_cover=blank_pages_before_cover,
+            blank_pages_after_cover=blank_pages_after_cover,
+        )
+    else:
+        if blank_pages_before_cover or blank_pages_after_cover:
+            model = LayoutModel.from_source(source_path)
+            for _ in range(blank_pages_before_cover):
+                model.insert_blank(0)
+            for _ in range(blank_pages_after_cover):
+                model.insert_blank(min(1, len(model.entries)))
+            pages = model.normalized_pages()
+            counts = model._counts()
+        else:
+            model = LayoutModel.from_source(source_path)
+            pages = model.normalized_pages()
+            counts = model._counts()
 
-    book_title = title or pdf_path.stem
-    pages, counts = _build_pages(
-        images,
-        blank_pages_before_cover=blank_pages_before_cover,
-        blank_pages_after_cover=blank_pages_after_cover,
-    )
+    book_title = title or source_path.stem
     return write_epub_from_pages(
         pages,
         epub_path,
-        source_path=pdf_path,
+        source_path=source_path,
         title=book_title,
         author=author,
         language=language,
@@ -107,28 +151,28 @@ def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
 
-    for pdf_path in args.pdfs:
-        if pdf_path.suffix.lower() != ".pdf":
-            raise PdfImageError(f"Not a PDF file: {pdf_path}")
-        output_dir = args.output_dir or pdf_path.parent
+    for source_path in args.sources:
+        if source_path.suffix.lower() not in {".pdf", ".cbz", ".zip"}:
+            raise PdfImageError(f"Unsupported source file: {source_path}")
+        output_dir = args.output_dir or source_path.parent
         output_dir.mkdir(parents=True, exist_ok=True)
-        epub_path = output_dir / pdf_path.with_suffix(".epub").name
-        counts = _convert_from_cli_args(pdf_path, epub_path, args)
+        epub_path = output_dir / source_path.with_suffix(".epub").name
+        counts = _convert_from_cli_args(source_path, epub_path, args)
         print(
-            f"{pdf_path.name} -> {epub_path}: "
+            f"{source_path.name} -> {epub_path}: "
             f"{counts['total']} pages ({counts.get('jpg', 0)} jpg, {counts.get('png', 0)} png)"
         )
     return 0
 
 
-def _convert_from_cli_args(pdf_path: Path, epub_path: Path, args: argparse.Namespace) -> dict[str, int]:
-    title = _cli_title(pdf_path, args)
+def _convert_from_cli_args(source_path: Path, epub_path: Path, args: argparse.Namespace) -> dict[str, int]:
+    title = _cli_title(source_path, args)
     if _uses_layout_model(args):
-        return _convert_with_layout_model(pdf_path, epub_path, args, title)
+        return _convert_with_layout_model(source_path, epub_path, args, title)
     cover_item_id = f"page-{args.cover_page:04d}" if args.cover_page is not None else None
     try:
-        return convert_pdf_to_epub(
-            pdf_path,
+        return convert_source_to_epub(
+            source_path,
             epub_path,
             overwrite=args.overwrite,
             title=title,
@@ -148,14 +192,14 @@ def _convert_from_cli_args(pdf_path: Path, epub_path: Path, args: argparse.Names
 
 
 def _convert_with_layout_model(
-    pdf_path: Path,
+    source_path: Path,
     epub_path: Path,
     args: argparse.Namespace,
     title: str,
 ) -> dict[str, int]:
     if epub_path.exists() and not args.overwrite:
         raise PdfImageError(f"Refusing to overwrite existing file: {epub_path}")
-    model = LayoutModel.from_pdf(pdf_path)
+    model = LayoutModel.from_source(source_path)
     if args.preset is not None:
         model.apply_preset(args.preset)
     _apply_cli_layout_operations(model, args)
@@ -197,13 +241,13 @@ def _apply_cli_layout_operations(model: LayoutModel, args: argparse.Namespace) -
         model.insert_image(position, image_path)
 
 
-def _cli_title(pdf_path: Path, args: argparse.Namespace) -> str:
+def _cli_title(source_path: Path, args: argparse.Namespace) -> str:
     if args.title:
         return args.title
     if args.series_title:
-        volume_number = args.volume_number if args.volume_number is not None else infer_volume_number(pdf_path)
+        volume_number = args.volume_number if args.volume_number is not None else infer_volume_number(source_path)
         return generated_volume_title(args.series_title, volume_number)
-    return pdf_path.stem
+    return source_path.stem
 
 
 def _parse_position_path(value: str) -> tuple[int, Path]:
@@ -244,7 +288,7 @@ class _EpubArgumentParser(argparse.ArgumentParser):
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = _EpubArgumentParser(description=__doc__)
-    parser.add_argument("pdfs", nargs="+", type=Path, help="PDF files to convert")
+    parser.add_argument("sources", nargs="+", type=Path, help="PDF, CBZ, or ZIP files to convert")
     parser.add_argument("--output-dir", type=Path, default=None, help="directory for EPUB output")
     parser.add_argument("--overwrite", action="store_true", help="replace existing EPUB files")
     parser.add_argument("--title", default=None, help="EPUB title")

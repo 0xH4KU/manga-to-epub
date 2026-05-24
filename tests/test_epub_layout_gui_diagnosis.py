@@ -633,6 +633,16 @@ class DiagnosisImportUxTests(unittest.TestCase):
         self.assertIn("Use Add Selected As Spread", message)
         self.assertNotIn("Use Import Spread Candidates", message)
 
+    def test_spread_scan_reports_pdf_only_for_archive_sources(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = SimpleNamespace(entries=[page(1), page(2)])
+        app.pdf_path = Path("/tmp/book.cbz")
+        app.status = SimpleNamespace(set=lambda value: setattr(app, "status_value", value))
+
+        app.run_spread_diagnosis()
+
+        self.assertEqual("Cross-page scan is available for PDF sources only.", app.status_value)
+
     def test_primary_panel_has_no_import_spread_candidates_button(self):
         labels = []
         parent = object()

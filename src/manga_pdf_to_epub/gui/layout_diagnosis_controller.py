@@ -228,6 +228,9 @@ class EpubLayoutDiagnosisMixin:
     def run_spread_diagnosis(self) -> None:
         if getattr(self, "model", None) is None or getattr(self, "pdf_path", None) is None:
             return
+        if Path(self.pdf_path).suffix.lower() != ".pdf":
+            self.status.set("Cross-page scan is available for PDF sources only.")
+            return
         project_root = Path(__file__).resolve().parents[2]
         output_dir = default_diagnosis_output_dir(project_root, self.pdf_path, "spread")
         settings = getattr(self, "diagnosis_settings", DiagnosisSettings())
@@ -334,6 +337,9 @@ class EpubLayoutDiagnosisMixin:
 
     def run_insert_point_scoring(self) -> None:
         if getattr(self, "model", None) is None or getattr(self, "pdf_path", None) is None:
+            return
+        if Path(self.pdf_path).suffix.lower() != ".pdf":
+            self.status.set("Insert-point scoring is available for PDF sources only.")
             return
         project_root = Path(__file__).resolve().parents[2]
         output_dir = default_diagnosis_output_dir(project_root, self.pdf_path, "insert")

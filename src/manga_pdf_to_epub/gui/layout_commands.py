@@ -5,7 +5,7 @@ from .layout_support import AppCommand
 
 def app_commands() -> tuple[AppCommand, ...]:
     return (
-        AppCommand("Open PDF", "open_pdf", keywords=("import", "load")),
+        AppCommand("Open Source", "open_pdf", keywords=("import", "load", "pdf", "cbz", "zip")),
         AppCommand("Import Series", "import_series", keywords=("folder", "volumes")),
         AppCommand("Export EPUB", "export_epub", keywords=("save",)),
         AppCommand("Mark Selected Volume Ready", "mark_selected_series_volume_ready", keywords=("series",)),

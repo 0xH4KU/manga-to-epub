@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import threading
 import tkinter as tk
+from io import BytesIO
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
@@ -55,7 +56,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
         self._pdf_doc_path: Path | None = None
         self.deleted_history: DeleteHistory[LayoutEntry] = DeleteHistory()
         self.ready_status_undo: list[list[tuple[SeriesVolume, str]]] = []
-        self.status = tk.StringVar(value="Open a PDF to begin.")
+        self.status = tk.StringVar(value="Open a source file to begin.")
         self.workspace_status = tk.StringVar(value="")
         self.apple_preview = tk.BooleanVar(value=True)
         self.title_var = tk.StringVar(value="")
@@ -151,7 +152,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
         toolbar_row.pack(anchor=tk.CENTER)
         toolbar_buttons = (
             ("Import Series...", self.import_series),
-            ("Open PDF", self.open_pdf),
+            ("Open Source", self.open_pdf),
             ("Export EPUB", self.export_epub),
             ("Export Ready Series...", self.export_ready_series),
             ("Open Project...", self.open_project),
@@ -262,6 +263,8 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
     def _show_inspector_tab(self, title: str) -> None:
         if title not in self.inspector_tabs:
             return
+        if getattr(self, "active_inspector_tab", None) == "Book" and title != "Book":
+            self._store_metadata_fields()
         self.active_inspector_tab = title
         self.inspector_tabs[title].tkraise()
         for tab_title, button in getattr(self, "inspector_tab_buttons", {}).items():
@@ -381,7 +384,7 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
 
     def _workspace_summary(self) -> str:
         if self.model is None:
-            page_summary = "No PDF loaded"
+            page_summary = "No source loaded"
         else:
             page_summary = f"Pages: {len(self.model.entries)}"
         if self.series_project is None:
@@ -402,16 +405,16 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
 
     def open_pdf(self) -> None:
         filename = filedialog.askopenfilename(
-            title="Open PDF",
-            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+            title="Open Source",
+            filetypes=[("Manga source files", "*.pdf *.cbz *.zip"), ("All files", "*.*")],
             initialdir=str(Path.cwd()),
         )
         if not filename:
             return
         self.pdf_path = Path(filename)
         self._run_background(
-            "Loading PDF images...",
-            lambda: LayoutModel.from_pdf(self.pdf_path),
+            "Loading source images...",
+            lambda: LayoutModel.from_source(self.pdf_path),
             self._open_pdf_done,
         )
 
@@ -909,25 +912,36 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
         self.exclude_cover_var.set(exclude_cover)
 
     def _store_metadata_fields(self) -> None:
-        if self.model is None:
+        model = getattr(self, "model", None)
+        series_project = getattr(self, "series_project", None)
+        if model is None and series_project is None:
             return
-        title = self.title_var.get().strip()
-        author = self.author_var.get().strip()
-        language = self.language_var.get().strip() or "zh-Hant"
-        if self.series_project is not None:
-            self.series_project.title = title or self.series_project.title
-            self.series_project.author = author
-            self.series_project.language = language
+        title_var = getattr(self, "title_var", None)
+        author_var = getattr(self, "author_var", None)
+        language_var = getattr(self, "language_var", None)
+        if title_var is None or author_var is None or language_var is None:
+            return
+        title = title_var.get().strip()
+        author = author_var.get().strip()
+        language = language_var.get().strip() or "zh-Hant"
+        if series_project is not None:
+            series_project.title = title or series_project.title
+            series_project.author = author
+            series_project.language = language
+            if model is None:
+                return
             active_volume = getattr(self, "active_series_volume", None)
-            if active_volume is not None and hasattr(self.series_project, "generated_title"):
-                self.model.title = self.series_project.generated_title(active_volume)
-            self.model.author = self.series_project.author
-            self.model.language = self.series_project.language
+            if active_volume is not None and hasattr(series_project, "generated_title"):
+                model.title = series_project.generated_title(active_volume)
+            model.author = series_project.author
+            model.language = series_project.language
         else:
-            self.model.title = title or self.model.source_path.stem
-            self.model.author = author
-            self.model.language = language
-        self.model.exclude_cover_from_reading = self.exclude_cover_var.get()
+            model.title = title or model.source_path.stem
+            model.author = author
+            model.language = language
+        exclude_cover_var = getattr(self, "exclude_cover_var", None)
+        if exclude_cover_var is not None:
+            model.exclude_cover_from_reading = exclude_cover_var.get()
 
     def _sync_metadata_label_texts(self) -> None:
         self._ensure_metadata_label_vars()
@@ -1010,8 +1024,10 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
             return
         if getattr(entry, "source_index", None) is None:
             photo = self._thumbnail_for_entry(entry, max_w, max_h)
-        else:
+        elif self._source_uses_pdf_renderer():
             photo = self._thumbnail_for_page(entry.page.index, max_w, max_h)
+        else:
+            photo = self._thumbnail_for_source_entry(entry, max_w, max_h)
         if photo is None:
             canvas.create_text(x + max_w // 2, y + max_h // 2, text=entry.label, fill="#202020")
             return
@@ -1047,6 +1063,12 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
             if hasattr(self, "status"):
                 self.status.set(f"Preview failed for page {page_index}.")
             return None
+
+    def _thumbnail_for_source_entry(self, entry, max_w: int, max_h: int) -> tk.PhotoImage | None:
+        return self._thumbnail_for_entry(entry, max_w, max_h)
+
+    def _source_uses_pdf_renderer(self) -> bool:
+        return self.pdf_path is not None and self.pdf_path.suffix.lower() == ".pdf"
 
     def _start_thumbnail_render(self, page_index: int, max_w: int, max_h: int, cache_key: tuple) -> None:
         if self.pdf_path is None or cache_key in self._thumbnail_render_jobs:
@@ -1129,7 +1151,11 @@ class EpubLayoutApp(EpubLayoutDiagnosisMixin, EpubLayoutSeriesMixin):
         if cached is not None:
             return cached
         try:
-            image = tk.PhotoImage(data=entry.page.load_image_data())
+            image_data = entry.page.load_image_data()
+            if _is_png_payload(image_data):
+                image = tk.PhotoImage(data=image_data)
+            else:
+                image = tk.PhotoImage(data=_preview_png_thumbnail(image_data, max_w, max_h))
             scale = max(1, int(max(image.width() / max_w, image.height() / max_h, 1)))
             if scale > 1:
                 image = image.subsample(scale, scale)
@@ -1146,6 +1172,24 @@ def main() -> int:
     EpubLayoutApp(root)
     root.mainloop()
     return 0
+
+
+def _is_png_payload(payload: bytes) -> bool:
+    return payload.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def _preview_png_thumbnail(payload: bytes, max_w: int, max_h: int) -> bytes:
+    from PIL import Image, ImageOps
+
+    with Image.open(BytesIO(payload)) as image:
+        frame = ImageOps.exif_transpose(image)
+        if frame.mode not in {"RGB", "RGBA"}:
+            has_alpha = "A" in frame.getbands() or (frame.mode == "P" and "transparency" in frame.info)
+            frame = frame.convert("RGBA" if has_alpha else "RGB")
+        frame.thumbnail((max(1, max_w), max(1, max_h)), Image.Resampling.LANCZOS)
+        output = BytesIO()
+        frame.save(output, format="PNG")
+        return output.getvalue()
 
 
 if __name__ == "__main__":

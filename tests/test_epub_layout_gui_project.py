@@ -53,6 +53,57 @@ class EpubLayoutGuiProjectTests(unittest.TestCase):
         self.assertEqual("晚安,布布 Vol.01", app.model.title)
         self.assertTrue(app.model.exclude_cover_from_reading)
 
+    def test_store_metadata_fields_updates_series_metadata_without_active_model(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = None
+        app.series_project = SimpleNamespace(title="Old", author="", language="zh-Hant")
+        app.title_var = SimpleNamespace(get=lambda: "迷宮飯")
+        app.author_var = SimpleNamespace(get=lambda: "九井諒子")
+        app.language_var = SimpleNamespace(get=lambda: "ja")
+        app.exclude_cover_var = FakeBool(False)
+
+        app._store_metadata_fields()
+
+        self.assertEqual("迷宮飯", app.series_project.title)
+        self.assertEqual("九井諒子", app.series_project.author)
+        self.assertEqual("ja", app.series_project.language)
+
+    def test_switching_away_from_metadata_tab_persists_series_metadata_edits(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.model = None
+        app.series_project = SimpleNamespace(title="Old", author="", language="zh-Hant")
+        app.title_var = SimpleNamespace(get=lambda: "迷宮飯")
+        app.author_var = SimpleNamespace(get=lambda: "九井諒子")
+        app.language_var = SimpleNamespace(get=lambda: "ja")
+        app.exclude_cover_var = FakeBool(False)
+        app.inspector_tabs = {
+            "Book": SimpleNamespace(tkraise=lambda: None),
+            "Series": SimpleNamespace(tkraise=lambda: None),
+        }
+        app.inspector_tab_buttons = {}
+        app.active_inspector_tab = "Book"
+
+        app._show_inspector_tab("Series")
+
+        self.assertEqual("迷宮飯", app.series_project.title)
+        self.assertEqual("九井諒子", app.series_project.author)
+        self.assertEqual("ja", app.series_project.language)
+
+    def test_inspector_tab_switch_stores_metadata_before_leaving_book_tab(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.inspector_tabs = {
+            "Book": SimpleNamespace(tkraise=lambda: None),
+            "Edit": SimpleNamespace(tkraise=lambda: None),
+        }
+        app.inspector_tab_buttons = {}
+        app.active_inspector_tab = "Book"
+        app._store_metadata_fields = lambda: setattr(app, "metadata_stored", True)
+
+        app._show_inspector_tab("Edit")
+
+        self.assertTrue(app.metadata_stored)
+        self.assertEqual("Edit", app.active_inspector_tab)
+
     def test_load_metadata_fields_reads_cover_only_option(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.model = FakeDeleteModel([entry("Page 1"), entry("Page 2")])
