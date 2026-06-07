@@ -1136,6 +1136,30 @@ class DiagnosisPreviewTests(unittest.TestCase):
         self.assertEqual(["Page 1", "Page 2"], diagnosis_refs)
         self.assertEqual(["main"], app.photo_refs)
 
+    def test_refresh_diagnosis_preview_uses_two_selected_candidate_pages(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        diagnosis_canvas = FakeCanvas()
+        diagnosis_refs = []
+        app.model = SimpleNamespace(entries=[page(index) for index in range(1, 74)])
+        app.apple_preview = SimpleNamespace(get=lambda: True)
+        app.diagnosis_window = SimpleNamespace(
+            spine_list=FakeListbox(selection=(70, 71)),
+            preview=diagnosis_canvas,
+            photo_refs=diagnosis_refs,
+        )
+        app.draws = []
+
+        def draw(canvas, photo_refs, entry, *_args):
+            app.draws.append((canvas, photo_refs, entry.label))
+            photo_refs.append(entry.label)
+
+        app._draw_entry_on_canvas = draw
+
+        app.refresh_diagnosis_preview()
+
+        self.assertEqual([(diagnosis_canvas, diagnosis_refs, "Page 71"), (diagnosis_canvas, diagnosis_refs, "Page 72")], app.draws)
+        self.assertEqual(["Page 71", "Page 72"], diagnosis_refs)
+
     def test_refresh_diagnosis_preview_noops_when_window_closed(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.diagnosis_window = None
