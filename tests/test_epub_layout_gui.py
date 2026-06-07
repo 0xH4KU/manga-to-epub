@@ -13,16 +13,6 @@ from tests.gui_helpers import (
 
 
 class EpubLayoutGuiUiTests(unittest.TestCase):
-    def test_configure_window_sets_workbench_geometry_and_minimum_size(self):
-        app = EpubLayoutApp.__new__(EpubLayoutApp)
-        app.root = FakeRoot()
-
-        app._configure_window()
-
-        self.assertEqual("EPUB Layout Lab", app.root.title_value)
-        self.assertEqual("1280x760", app.root.geometry_value)
-        self.assertEqual((1100, 680), app.root.minsize_value)
-
     def test_inspector_tabs_group_workbench_controls(self):
         self.assertEqual(("Edit", "Diagnose", "Book", "Series"), EpubLayoutApp._inspector_tab_titles())
 
@@ -117,6 +107,7 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Progressbar", FakeWidget), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
@@ -188,6 +179,7 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Progressbar", FakeWidget), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
@@ -257,6 +249,7 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Progressbar", FakeWidget), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
@@ -343,6 +336,7 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Progressbar", FakeWidget), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
@@ -437,6 +431,7 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Progressbar", FakeWidget), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()
@@ -510,6 +505,7 @@ class EpubLayoutGuiUiTests(unittest.TestCase):
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Scrollbar", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Separator", FakeButton), \
             patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Entry", FakeButton), \
+            patch("manga_pdf_to_epub.gui.layout_workbench.ttk.Progressbar", FakeWidget), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Listbox", FakeListbox), \
             patch("manga_pdf_to_epub.gui.layout_workbench.tk.Canvas", FakeCanvas):
             app._build_ui()

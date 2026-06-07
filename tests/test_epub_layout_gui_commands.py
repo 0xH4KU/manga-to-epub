@@ -18,6 +18,29 @@ from tests.gui_helpers import (
 from tests.helpers import tiny_png
 
 
+class FakeProgress:
+    def __init__(self):
+        self.pack_calls = []
+        self.start_calls = []
+        self.stop_count = 0
+        self.forget_count = 0
+        self.packed = False
+
+    def pack(self, *args, **kwargs):
+        self.pack_calls.append((args, kwargs))
+        self.packed = True
+
+    def pack_forget(self):
+        self.forget_count += 1
+        self.packed = False
+
+    def start(self, interval=None):
+        self.start_calls.append(interval)
+
+    def stop(self):
+        self.stop_count += 1
+
+
 class EpubLayoutGuiCommandTests(unittest.TestCase):
     def test_bind_shortcuts_registers_safe_layout_actions(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
@@ -172,7 +195,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app._busy = False
         app.done_value = None
 
-        with patch("manga_pdf_to_epub.gui.layout_app.threading.Thread") as thread:
+        with patch("manga_pdf_to_epub.gui.layout_background_controller.threading.Thread") as thread:
             thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
             started = app._run_background("Working...", lambda: 42, lambda value: setattr(app, "done_value", value))
 
@@ -181,13 +204,63 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         self.assertEqual(42, app.done_value)
         self.assertEqual("Working...", app.status.value)
 
+    def test_run_background_starts_statusbar_progress_until_worker_finishes(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = FakeRoot()
+        app.status = FakeStatus()
+        app.background_progress = FakeProgress()
+        app._busy = False
+        pending = {}
+
+        with patch("manga_pdf_to_epub.gui.layout_background_controller.threading.Thread") as thread:
+            thread.side_effect = lambda target, daemon: SimpleNamespace(
+                start=lambda: pending.setdefault("target", target)
+            )
+            started = app._run_background("Working...", lambda: 42, lambda value: None)
+
+        self.assertTrue(started)
+        self.assertTrue(app._busy)
+        self.assertTrue(app.background_progress.packed)
+        self.assertEqual([10], app.background_progress.start_calls)
+        self.assertIn("target", pending)
+
+    def test_background_done_stops_statusbar_progress(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.background_progress = FakeProgress()
+        app.background_progress.pack()
+        app.background_progress.start(10)
+        app._busy = True
+
+        app._background_done(42, lambda value: setattr(app, "done_value", value))
+
+        self.assertFalse(app._busy)
+        self.assertEqual(42, app.done_value)
+        self.assertEqual(1, app.background_progress.stop_count)
+        self.assertEqual(1, app.background_progress.forget_count)
+        self.assertFalse(app.background_progress.packed)
+
+    def test_background_failed_stops_statusbar_progress(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.background_progress = FakeProgress()
+        app.background_progress.pack()
+        app.background_progress.start(10)
+        app._busy = True
+
+        app._background_failed(ValueError("bad"), on_failure=lambda exc: setattr(app, "failure_message", str(exc)))
+
+        self.assertFalse(app._busy)
+        self.assertEqual("bad", app.failure_message)
+        self.assertEqual(1, app.background_progress.stop_count)
+        self.assertEqual(1, app.background_progress.forget_count)
+        self.assertFalse(app.background_progress.packed)
+
     def test_run_background_uses_custom_failure_handler(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.root = FakeRoot()
         app.status = FakeStatus()
         app._busy = False
 
-        with patch("manga_pdf_to_epub.gui.layout_app.threading.Thread") as thread:
+        with patch("manga_pdf_to_epub.gui.layout_background_controller.threading.Thread") as thread:
             thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
             started = app._run_background(
                 "Working...",
@@ -208,7 +281,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         queued = []
         app.root.after = lambda delay, callback: queued.append(callback)
 
-        with patch("manga_pdf_to_epub.gui.layout_app.threading.Thread") as thread:
+        with patch("manga_pdf_to_epub.gui.layout_background_controller.threading.Thread") as thread:
             thread.side_effect = lambda target, daemon: SimpleNamespace(start=target)
             app._run_background(
                 "Working...",
@@ -225,12 +298,15 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.root = FakeRoot()
         app.status = FakeStatus()
+        app.background_progress = FakeProgress()
         app._busy = True
 
         started = app._run_background("Working...", lambda: 42, lambda value: None)
 
         self.assertFalse(started)
         self.assertEqual("Another operation is already running.", app.status.value)
+        self.assertEqual([], app.background_progress.start_calls)
+        self.assertEqual([], app.background_progress.pack_calls)
 
     def test_open_pdf_uses_background_loader(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
