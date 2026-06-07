@@ -1,0 +1,29 @@
+from __future__ import annotations
+
+from manga_pdf_to_epub.diagnosis.spread_continuity.lib.scoring.pair_scoring import score_pair
+from manga_pdf_to_epub.diagnosis.spread_continuity.lib.core.types import Page, PairScore
+
+
+def score_pair_job(
+    job: tuple[Page, Page, float, float, int, set[str] | None],
+) -> PairScore:
+    right, left, band_ratio, wide_ratio, max_offset, truth_tokens = job
+    return score_pair(right, left, band_ratio, wide_ratio, max_offset, truth_tokens)
+
+
+def score_candidate_pairs(
+    candidate_pairs: list[tuple[Page, Page]],
+    band_ratio: float,
+    wide_ratio: float,
+    max_offset: int,
+    truth_tokens: set[str] | None,
+    workers: int,
+) -> list[PairScore]:
+    jobs = [(right, left, band_ratio, wide_ratio, max_offset, truth_tokens) for right, left in candidate_pairs]
+    if workers <= 1 or len(jobs) <= 1:
+        return [score_pair_job(job) for job in jobs]
+
+    from multiprocessing import get_context
+
+    with get_context("spawn").Pool(processes=workers) as pool:
+        return list(pool.imap(score_pair_job, jobs))

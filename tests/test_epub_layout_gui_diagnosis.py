@@ -701,7 +701,7 @@ class DiagnosisSettingsTests(unittest.TestCase):
 
         initialize_diagnosis_state(app, source_page_count=10)
 
-        self.assertEqual(4, app.diagnosis_settings.spread_workers)
+        self.assertEqual(2, app.diagnosis_settings.spread_workers)
         self.assertEqual(0.53, app.diagnosis_settings.spread_threshold)
 
     def test_run_spread_diagnosis_passes_current_settings(self):

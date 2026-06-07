@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 
 @dataclass(frozen=True)
 class DiagnosisSettings:
-    spread_workers: int = 4
+    spread_workers: int = 2
     spread_threshold: float = 0.53
-    spread_debug_limit: int = 80
-    spread_max_height: int = 1000
+    spread_debug_limit: int = 20
+    spread_max_height: int = 900
     insert_thumb_height: int = 900
 
     def __post_init__(self) -> None:
@@ -53,15 +54,11 @@ def resolve_spread_scan_command(
     settings: DiagnosisSettings | None = None,
 ) -> DiagnosisCommand | None:
     settings = settings or DiagnosisSettings()
-    spread_root = Path(project_root).absolute().parent / "manga-spread-continuity"
-    python_path = spread_root / ".venv" / "bin" / "python"
-    script_path = spread_root / "tools" / "scan_pdf_adjacent.py"
-    if not python_path.exists() or not script_path.exists():
-        return None
     return DiagnosisCommand(
         (
-            str(python_path),
-            str(script_path),
+            sys.executable,
+            "-m",
+            "manga_pdf_to_epub.diagnosis.spread_continuity.scan_pdf_adjacent",
             str(pdf_path),
             "--output",
             str(output_dir),
@@ -76,9 +73,22 @@ def resolve_spread_scan_command(
             "--max-height",
             str(settings.spread_max_height),
         ),
-        spread_root,
+        Path(project_root),
         Path(output_dir),
+        {"PYTHONPATH": _builtin_scanner_pythonpath(Path(project_root))},
     )
+
+
+def _builtin_scanner_pythonpath(project_root: Path) -> str:
+    src_dir = project_root / "src"
+    if (project_root / "manga_pdf_to_epub").exists():
+        candidates = [str(project_root)]
+    else:
+        candidates = [str(src_dir), str(project_root)]
+    existing = os.environ.get("PYTHONPATH")
+    if existing:
+        candidates.append(existing)
+    return os.pathsep.join(candidates)
 
 
 def resolve_insert_score_command(

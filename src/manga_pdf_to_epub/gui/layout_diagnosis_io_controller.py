@@ -34,7 +34,7 @@ class EpubLayoutDiagnosisIOMixin:
         if command is None:
             messagebox.showerror(
                 "Spread scan unavailable",
-                "Could not find sibling manga-spread-continuity environment. "
+                "Could not prepare the built-in spread scanner. "
                 "Use Add Selected As Spread in the Diagnose window for manual review.",
             )
             return

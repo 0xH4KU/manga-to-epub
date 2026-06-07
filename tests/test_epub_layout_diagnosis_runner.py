@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import unittest
+import subprocess
 from pathlib import Path
 
 from manga_pdf_to_epub.gui.layout_diagnosis_runner import (
@@ -23,53 +24,55 @@ class DiagnosisRunnerTests(unittest.TestCase):
             default_diagnosis_output_dir(root, pdf, "spread"),
         )
 
-    def test_resolves_sibling_spread_continuity_command_when_present(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            manga_root = Path(tmp)
-            main_root = manga_root / "manga-pdf-to-epub"
-            spread_root = manga_root / "manga-spread-continuity"
-            python_path = spread_root / ".venv" / "bin" / "python"
-            script_path = spread_root / "tools" / "scan_pdf_adjacent.py"
-            python_path.parent.mkdir(parents=True)
-            script_path.parent.mkdir(parents=True)
-            python_path.write_text("", encoding="utf-8")
-            script_path.write_text("", encoding="utf-8")
-            output_dir = main_root / "out"
+    def test_resolves_builtin_spread_continuity_command(self):
+        output_dir = Path("/repo/manga-pdf-to-epub/out")
 
-            command = resolve_spread_scan_command(main_root, Path("/books/book.pdf"), output_dir)
+        command = resolve_spread_scan_command(Path("/repo/manga-pdf-to-epub"), Path("/books/book.pdf"), output_dir)
 
         self.assertIsInstance(command, DiagnosisCommand)
-        self.assertEqual(spread_root, command.cwd)
-        self.assertIn("scan_pdf_adjacent.py", command.argv[1])
+        self.assertEqual(Path("/repo/manga-pdf-to-epub"), command.cwd)
+        self.assertEqual(sys.executable, command.argv[0])
+        self.assertEqual("-m", command.argv[1])
+        self.assertEqual("manga_pdf_to_epub.diagnosis.spread_continuity.scan_pdf_adjacent", command.argv[2])
         self.assertIn("--reading", command.argv)
         self.assertIn("--workers", command.argv)
-        self.assertEqual("4", command.argv[command.argv.index("--workers") + 1])
+        self.assertEqual("2", command.argv[command.argv.index("--workers") + 1])
+        self.assertEqual("20", command.argv[command.argv.index("--debug-limit") + 1])
+        self.assertEqual("900", command.argv[command.argv.index("--max-height") + 1])
+        self.assertIsNotNone(command.env)
+        self.assertIn(str(Path("/repo/manga-pdf-to-epub/src")), command.env["PYTHONPATH"])
 
     def test_spread_command_uses_manual_diagnosis_settings(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            manga_root = Path(tmp)
-            main_root = manga_root / "manga-pdf-to-epub"
-            spread_root = manga_root / "manga-spread-continuity"
-            python_path = spread_root / ".venv" / "bin" / "python"
-            script_path = spread_root / "tools" / "scan_pdf_adjacent.py"
-            python_path.parent.mkdir(parents=True)
-            script_path.parent.mkdir(parents=True)
-            python_path.write_text("", encoding="utf-8")
-            script_path.write_text("", encoding="utf-8")
-            settings = DiagnosisSettings(
-                spread_workers=6,
-                spread_threshold=0.61,
-                spread_debug_limit=12,
-                spread_max_height=1400,
-                insert_thumb_height=800,
-            )
+        settings = DiagnosisSettings(
+            spread_workers=6,
+            spread_threshold=0.61,
+            spread_debug_limit=12,
+            spread_max_height=1400,
+            insert_thumb_height=800,
+        )
 
-            command = resolve_spread_scan_command(main_root, Path("/books/book.pdf"), main_root / "out", settings)
+        command = resolve_spread_scan_command(Path("/repo/manga-pdf-to-epub"), Path("/books/book.pdf"), Path("/repo/out"), settings)
 
         self.assertEqual("6", command.argv[command.argv.index("--workers") + 1])
         self.assertEqual("0.61", command.argv[command.argv.index("--spread-threshold") + 1])
         self.assertEqual("12", command.argv[command.argv.index("--debug-limit") + 1])
         self.assertEqual("1400", command.argv[command.argv.index("--max-height") + 1])
+
+    def test_builtin_spread_scanner_module_is_runnable(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "manga_pdf_to_epub.diagnosis.spread_continuity.scan_pdf_adjacent",
+                "--help",
+            ],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertIn("--workers", completed.stdout)
+        self.assertIn("--max-height", completed.stdout)
 
     def test_diagnosis_settings_reject_invalid_values(self):
         with self.assertRaises(ValueError):
@@ -78,12 +81,6 @@ class DiagnosisRunnerTests(unittest.TestCase):
             DiagnosisSettings(spread_threshold=1.1)
         with self.assertRaises(ValueError):
             DiagnosisSettings(spread_debug_limit=-1)
-
-    def test_missing_sibling_spread_command_returns_none(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            command = resolve_spread_scan_command(Path(tmp) / "manga-pdf-to-epub", Path("/books/book.pdf"), Path(tmp) / "out")
-
-        self.assertIsNone(command)
 
     def test_resolves_sibling_insert_point_command_when_present(self):
         with tempfile.TemporaryDirectory() as tmp:
