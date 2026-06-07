@@ -1571,6 +1571,24 @@ class DiagnosisSpreadScanWorkflowTests(unittest.TestCase):
 
         self.assertEqual(["037-038"], [candidate.pair_id for candidate in candidates])
 
+    def test_spread_scan_work_forwards_progress_callback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            (output_dir / "adjacent_clusters.csv").write_text(
+                "start_page,end_page,decision,spread,review_score\n37,38,review,0.91,0.88\n",
+                encoding="utf-8",
+            )
+            def callback(event):
+                return None
+
+            with patch(
+                "manga_pdf_to_epub.gui.layout_diagnosis_io_controller.run_diagnosis_command",
+                return_value=SimpleNamespace(output_dir=output_dir),
+            ) as run:
+                _run_spread_scan_work(SimpleNamespace(), source_page_count=50, progress_callback=callback)
+
+        self.assertIs(callback, run.call_args.kwargs["progress_callback"])
+
     def test_spread_scan_work_validates_candidates_in_background_phase(self):
         with tempfile.TemporaryDirectory() as tmp:
             output_dir = Path(tmp)

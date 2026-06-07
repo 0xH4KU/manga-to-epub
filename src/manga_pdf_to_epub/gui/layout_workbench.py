@@ -111,6 +111,6 @@ class EpubLayoutWorkbenchMixin:
         statusbar = ttk.Frame(self.root, padding=(8, 4))
         statusbar.pack(side=tk.BOTTOM, fill=tk.X)
         ttk.Label(statusbar, textvariable=self.status).pack(side=tk.LEFT)
-        self.background_progress = ttk.Progressbar(statusbar, mode="indeterminate", length=140)
+        self.background_progress = ttk.Progressbar(statusbar, mode="determinate", maximum=100, value=0, length=140)
         ttk.Label(statusbar, textvariable=self.workspace_status).pack(side=tk.RIGHT)
         self.refresh_workspace_status()

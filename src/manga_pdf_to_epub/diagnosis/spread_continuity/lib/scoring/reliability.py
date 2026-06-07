@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from manga_pdf_to_epub.diagnosis.spread_continuity.lib.core.image_io import resize_page
 from manga_pdf_to_epub.diagnosis.spread_continuity.lib.scoring.pair_scoring import score_pair
 from manga_pdf_to_epub.diagnosis.spread_continuity.lib.core.reliability import (
@@ -63,6 +65,7 @@ def reliability_signals_for_candidates(
     truth_tokens: set[str] | None,
     workers: int,
     stability_threshold: float,
+    progress_callback: Callable[[tuple[str, ReliabilitySignals]], None] | None = None,
 ) -> dict[str, ReliabilitySignals]:
     pages_by_pair = {(right.name, left.name): (right, left) for right, left in candidate_pairs}
     jobs = []
@@ -78,9 +81,20 @@ def reliability_signals_for_candidates(
     if not jobs:
         return {}
     if workers <= 1 or len(jobs) <= 1:
-        return dict(reliability_probe_job(job) for job in jobs)
+        signals = {}
+        for job in jobs:
+            key, value = reliability_probe_job(job)
+            signals[key] = value
+            if progress_callback is not None:
+                progress_callback((key, value))
+        return signals
 
     from multiprocessing import get_context
 
     with get_context("spawn").Pool(processes=workers) as pool:
-        return dict(pool.imap(reliability_probe_job, jobs))
+        signals = {}
+        for key, value in pool.imap(reliability_probe_job, jobs):
+            signals[key] = value
+            if progress_callback is not None:
+                progress_callback((key, value))
+        return signals

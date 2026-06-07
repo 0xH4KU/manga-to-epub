@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
+from typing import Callable
 
 import cv2
 import fitz
@@ -56,6 +58,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--page-from", type=int, default=1)
     parser.add_argument("--page-to", type=int, default=0, help="Inclusive page number; 0 means end of PDF.")
+    parser.add_argument("--progress", action="store_true", help="Emit machine-readable progress events on stderr.")
     return parser.parse_args()
 
 
@@ -72,6 +75,16 @@ def render_page(doc: fitz.Document, page_no: int, max_height: int) -> Page:
     return Page(f"page-{page_no:03d}", Path(f"page-{page_no:03d}.png"), bgr, gray)
 
 
+def progress_reporter(enabled: bool) -> Callable[[int, int, str], None]:
+    def report(completed: int, total: int, message: str) -> None:
+        if not enabled:
+            return
+        payload = {"completed": completed, "total": max(1, total), "message": message}
+        print(f"MTE_PROGRESS {json.dumps(payload, separators=(',', ':'))}", file=sys.stderr, flush=True)
+
+    return report
+
+
 def main() -> int:
     args = parse_args()
     if not args.pdf.exists():
@@ -82,6 +95,7 @@ def main() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     debug_dir = args.output / "debug"
     debug_dir.mkdir(parents=True, exist_ok=True)
+    progress = progress_reporter(args.progress)
 
     doc = fitz.open(args.pdf)
     page_to = args.page_to if args.page_to > 0 else doc.page_count
@@ -90,7 +104,19 @@ def main() -> int:
         return 1
 
     render_started = time.perf_counter()
-    pages = [render_page(doc, page_no, args.max_height) for page_no in range(args.page_from, page_to + 1)]
+    page_numbers = list(range(args.page_from, page_to + 1))
+    total_pages = len(page_numbers)
+    total_pairs = max(0, total_pages - 1)
+    reliability_budget = 0 if args.no_reliability_adjustment else total_pairs
+    score_base = total_pages
+    total_units = total_pages + total_pairs + reliability_budget + 1
+    completed_units = 0
+    progress(completed_units, total_units, "Preparing cross-page scan.")
+    pages = []
+    for page_no in page_numbers:
+        pages.append(render_page(doc, page_no, args.max_height))
+        completed_units += 1
+        progress(completed_units, total_units, f"Rendering page {len(pages)}/{total_pages}.")
     render_elapsed = time.perf_counter() - render_started
     pages_by_name = {page.name: page for page in pages}
 
@@ -102,6 +128,13 @@ def main() -> int:
         else:
             right, left = second, first
         candidate_pairs.append((right, left))
+    scored_pairs = 0
+
+    def score_progress(_score) -> None:
+        nonlocal scored_pairs
+        scored_pairs += 1
+        progress(score_base + scored_pairs, total_units, f"Scoring adjacent pair {scored_pairs}/{total_pairs}.")
+
     scores = score_candidate_pairs(
         candidate_pairs,
         args.band_ratio,
@@ -109,12 +142,29 @@ def main() -> int:
         args.max_offset,
         None,
         args.workers,
+        score_progress,
     )
+    completed_units = score_base + total_pairs
     score_elapsed = time.perf_counter() - score_started
 
     scores = attach_raw_scores(scores) if args.no_context_adjustment else apply_contextual_adjustment(scores)
     if not args.no_reliability_adjustment:
         reliability_started = time.perf_counter()
+        reliability_candidates = [
+            score for score in scores if max(score.spread, score.review_score) >= args.stability_threshold
+        ]
+        reliability_total = len(reliability_candidates)
+        reliability_done = 0
+
+        def reliability_progress(_signals) -> None:
+            nonlocal reliability_done
+            reliability_done += 1
+            progress(
+                completed_units + reliability_done,
+                total_units,
+                f"Checking stability {reliability_done}/{reliability_total}.",
+            )
+
         signals = reliability_signals_for_candidates(
             candidate_pairs,
             scores,
@@ -124,9 +174,12 @@ def main() -> int:
             None,
             args.workers,
             args.stability_threshold,
+            reliability_progress,
         )
+        completed_units += reliability_budget
         scores = apply_reliability_adjustment(scores, signals)
         score_elapsed += time.perf_counter() - reliability_started
+    progress(total_units - 1, total_units, "Writing scan results.")
     scores.sort(key=lambda s: (-s.spread, -s.review_score, s.right_name, s.left_name))
     write_scores(scores, args.output / "scores.csv")
     write_review(scores, args.output / "review.csv", args.spread_threshold)
@@ -141,6 +194,7 @@ def main() -> int:
         write_debug(score, pages_by_name, debug_dir / filename)
 
     elapsed = time.perf_counter() - started
+    progress(total_units, total_units, "Cross-page scan complete.")
     print(
         f"Rendered {len(pages)} pages in {render_elapsed:.2f}s; "
         f"scored {len(scores)} adjacent pairs in {score_elapsed:.2f}s; total {elapsed:.2f}s"

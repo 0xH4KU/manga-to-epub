@@ -40,7 +40,11 @@ class EpubLayoutDiagnosisIOMixin:
             return
         self._run_background(
             "Running cross-page scan. This can take a few minutes.",
-            lambda: _run_spread_scan_work(command, self.diagnosis_session.source_page_count),
+            lambda: _run_spread_scan_work(
+                command,
+                self.diagnosis_session.source_page_count,
+                self._queue_background_progress_event,
+            ),
             self._spread_scan_done,
             on_failure=self._spread_scan_failed,
         )
@@ -136,8 +140,8 @@ def diagnosis_output_root_for_current_pdf(project_root: Path, pdf_path: Path) ->
     return default_diagnosis_output_dir(project_root, pdf_path, "spread").parent
 
 
-def _run_spread_scan_work(command, source_page_count: int = 0) -> list[SpreadCandidate]:
-    result = run_diagnosis_command(command)
+def _run_spread_scan_work(command, source_page_count: int = 0, progress_callback=None) -> list[SpreadCandidate]:
+    result = run_diagnosis_command(command, progress_callback=progress_callback)
     candidates = read_spread_candidates_csv(result.output_dir / "adjacent_clusters.csv")
     DiagnosisSession(source_page_count).load_spread_candidates(candidates)
     return candidates

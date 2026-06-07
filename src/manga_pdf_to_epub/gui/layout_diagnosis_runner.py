@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,7 @@ def resolve_spread_scan_command(
             str(settings.spread_workers),
             "--max-height",
             str(settings.spread_max_height),
+            "--progress",
         ),
         Path(project_root),
         Path(output_dir),
@@ -115,15 +119,89 @@ def resolve_insert_score_command(
     )
 
 
-def run_diagnosis_command(command: DiagnosisCommand) -> DiagnosisRunResult:
+def run_diagnosis_command(
+    command: DiagnosisCommand,
+    progress_callback: Callable[[dict], None] | None = None,
+) -> DiagnosisRunResult:
     command.output_dir.mkdir(parents=True, exist_ok=True)
     env = os.environ | (command.env or {})
-    completed = subprocess.run(
+    if progress_callback is None:
+        completed = subprocess.run(
+            command.argv,
+            cwd=command.cwd,
+            env=env,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        return DiagnosisRunResult(command.output_dir, completed.stdout, completed.stderr)
+
+    process = subprocess.Popen(
         command.argv,
         cwd=command.cwd,
         env=env,
-        check=True,
         text=True,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    return DiagnosisRunResult(command.output_dir, completed.stdout, completed.stderr)
+    stdout_lines: list[str] = []
+    stderr_lines: list[str] = []
+    stdout_thread = threading.Thread(target=_collect_stream_lines, args=(process.stdout, stdout_lines))
+    stderr_thread = threading.Thread(
+        target=_collect_progress_stream_lines,
+        args=(process.stderr, stderr_lines, progress_callback),
+    )
+    stdout_thread.start()
+    stderr_thread.start()
+    returncode = process.wait()
+    stdout_thread.join()
+    stderr_thread.join()
+    stdout = "".join(stdout_lines)
+    stderr = "".join(stderr_lines)
+    if returncode:
+        raise subprocess.CalledProcessError(
+            returncode,
+            command.argv,
+            output=stdout,
+            stderr=stderr,
+        )
+    return DiagnosisRunResult(command.output_dir, stdout, stderr)
+
+
+def _collect_stream_lines(stream, retained: list[str]) -> None:
+    if stream is None:
+        return
+    with stream:
+        for line in stream:
+            retained.append(line)
+
+
+def _collect_progress_stream_lines(stream, retained: list[str], progress_callback: Callable[[dict], None]) -> None:
+    if stream is None:
+        return
+    with stream:
+        for line in stream:
+            retained_line = _consume_progress_line(line, progress_callback)
+            if retained_line is not None:
+                retained.append(retained_line)
+
+
+def _consume_progress_lines(stderr: str, progress_callback: Callable[[dict], None]) -> str:
+    retained = []
+    for line in stderr.splitlines(keepends=True):
+        retained_line = _consume_progress_line(line, progress_callback)
+        if retained_line is not None:
+            retained.append(retained_line)
+    return "".join(retained)
+
+
+def _consume_progress_line(line: str, progress_callback: Callable[[dict], None]) -> str | None:
+    marker = "MTE_PROGRESS "
+    if not line.startswith(marker):
+        return line
+    payload = line.removeprefix(marker)
+    try:
+        progress_callback(json.loads(payload))
+    except json.JSONDecodeError:
+        return line
+    return None

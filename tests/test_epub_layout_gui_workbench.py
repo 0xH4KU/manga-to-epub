@@ -43,7 +43,9 @@ class EpubLayoutGuiWorkbenchTests(unittest.TestCase):
             app._build_statusbar()
 
         self.assertEqual([app.background_progress], progressbars)
-        self.assertEqual("indeterminate", app.background_progress.options["mode"])
+        self.assertEqual("determinate", app.background_progress.options["mode"])
         self.assertEqual(140, app.background_progress.options["length"])
+        self.assertEqual(100, app.background_progress.options["maximum"])
+        self.assertEqual(0, app.background_progress.options["value"])
         self.assertFalse(app.background_progress.packed)
         self.assertTrue(app.workspace_refreshed)

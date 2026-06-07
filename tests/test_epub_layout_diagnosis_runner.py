@@ -36,6 +36,7 @@ class DiagnosisRunnerTests(unittest.TestCase):
         self.assertEqual("manga_pdf_to_epub.diagnosis.spread_continuity.scan_pdf_adjacent", command.argv[2])
         self.assertIn("--reading", command.argv)
         self.assertIn("--workers", command.argv)
+        self.assertIn("--progress", command.argv)
         self.assertEqual("2", command.argv[command.argv.index("--workers") + 1])
         self.assertEqual("20", command.argv[command.argv.index("--debug-limit") + 1])
         self.assertEqual("900", command.argv[command.argv.index("--max-height") + 1])
@@ -73,6 +74,7 @@ class DiagnosisRunnerTests(unittest.TestCase):
 
         self.assertIn("--workers", completed.stdout)
         self.assertIn("--max-height", completed.stdout)
+        self.assertIn("--progress", completed.stdout)
 
     def test_diagnosis_settings_reject_invalid_values(self):
         with self.assertRaises(ValueError):
@@ -137,6 +139,33 @@ class DiagnosisRunnerTests(unittest.TestCase):
             )
 
         self.assertIn("ok", result.stdout)
+
+    def test_run_diagnosis_command_streams_progress_events_from_stderr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            script_path = tmp_path / "progress.py"
+            script_path.write_text(
+                "import sys\n"
+                "print('MTE_PROGRESS {\"completed\": 1, \"total\": 3, \"message\": \"Rendering 1/3\"}', file=sys.stderr, flush=True)\n"
+                "print('ordinary warning', file=sys.stderr, flush=True)\n"
+                "print('done')\n",
+                encoding="utf-8",
+            )
+            events = []
+
+            result = run_diagnosis_command(
+                DiagnosisCommand(
+                    (sys.executable, str(script_path)),
+                    cwd=tmp_path,
+                    output_dir=tmp_path / "out",
+                ),
+                progress_callback=events.append,
+            )
+
+        self.assertEqual([{"completed": 1, "total": 3, "message": "Rendering 1/3"}], events)
+        self.assertIn("done", result.stdout)
+        self.assertIn("ordinary warning", result.stderr)
+        self.assertNotIn("MTE_PROGRESS", result.stderr)
 
 
 if __name__ == "__main__":

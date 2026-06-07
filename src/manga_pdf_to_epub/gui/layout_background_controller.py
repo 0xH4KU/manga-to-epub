@@ -28,8 +28,27 @@ class EpubLayoutBackgroundMixin:
         progress = getattr(self, "background_progress", None)
         if progress is None:
             return
+        progress.configure(mode="indeterminate", maximum=100, value=0)
         progress.pack(side=tk.LEFT, padx=(8, 0))
         progress.start(10)
+
+    def _queue_background_progress_event(self, event: dict) -> None:
+        self.root.after(0, lambda event=dict(event): self._background_progress_event(event))
+
+    def _background_progress_event(self, event: dict) -> None:
+        progress = getattr(self, "background_progress", None)
+        if progress is None:
+            return
+        total = int(event.get("total") or 0)
+        completed = int(event.get("completed") or 0)
+        if total <= 0:
+            return
+        progress.stop()
+        progress.pack(side=tk.LEFT, padx=(8, 0))
+        progress.configure(mode="determinate", maximum=total, value=max(0, min(completed, total)))
+        message = event.get("message")
+        if message:
+            self.status.set(str(message))
 
     def _stop_background_progress(self) -> None:
         progress = getattr(self, "background_progress", None)

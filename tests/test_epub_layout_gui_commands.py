@@ -25,6 +25,7 @@ class FakeProgress:
         self.stop_count = 0
         self.forget_count = 0
         self.packed = False
+        self.options = {}
 
     def pack(self, *args, **kwargs):
         self.pack_calls.append((args, kwargs))
@@ -39,6 +40,9 @@ class FakeProgress:
 
     def stop(self):
         self.stop_count += 1
+
+    def configure(self, **kwargs):
+        self.options.update(kwargs)
 
 
 class EpubLayoutGuiCommandTests(unittest.TestCase):
@@ -307,6 +311,31 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         self.assertEqual("Another operation is already running.", app.status.value)
         self.assertEqual([], app.background_progress.start_calls)
         self.assertEqual([], app.background_progress.pack_calls)
+
+    def test_background_progress_event_switches_to_real_percentage(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.root = FakeRoot()
+        app.status = FakeStatus()
+        app.background_progress = FakeProgress()
+
+        app._background_progress_event({"completed": 2, "total": 5, "message": "Scoring adjacent pair 2/5."})
+
+        self.assertTrue(app.background_progress.packed)
+        self.assertEqual(1, app.background_progress.stop_count)
+        self.assertEqual(
+            {"mode": "determinate", "maximum": 5, "value": 2},
+            app.background_progress.options,
+        )
+        self.assertEqual("Scoring adjacent pair 2/5.", app.status.value)
+
+    def test_start_background_progress_resets_to_indeterminate_until_real_events_arrive(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        app.background_progress = FakeProgress()
+
+        app._start_background_progress()
+
+        self.assertEqual({"mode": "indeterminate", "maximum": 100, "value": 0}, app.background_progress.options)
+        self.assertEqual([10], app.background_progress.start_calls)
 
     def test_open_pdf_uses_background_loader(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
