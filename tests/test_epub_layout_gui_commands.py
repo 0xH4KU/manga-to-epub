@@ -442,13 +442,14 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         image_data = photo.call_args.kwargs["data"]
         self.assertEqual(b"\x89PNG\r\n\x1a\n", image_data[:8])
 
-    def test_thumbnail_render_done_caches_image_and_refreshes_current_pdf(self):
+    def test_thumbnail_render_done_caches_image_and_refreshes_current_pdf_previews(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
         app.pdf_path = Path("/tmp/book.pdf")
         app.thumbnail_cache = {}
         app._thumbnail_render_jobs = {("pdf", 1, 100, 150)}
         app._thumbnail_cache_generation = 2
         app.refresh_preview = lambda: setattr(app, "preview_refreshed", True)
+        app.refresh_diagnosis_preview = lambda: setattr(app, "diagnosis_preview_refreshed", True)
         photo_image = object()
 
         with patch("manga_pdf_to_epub.gui.layout_preview_controller.tk.PhotoImage", return_value=photo_image) as photo:
@@ -458,6 +459,7 @@ class EpubLayoutGuiCommandTests(unittest.TestCase):
         self.assertEqual(photo_image, app.thumbnail_cache[("pdf", 1, 100, 150)])
         self.assertEqual(set(), app._thumbnail_render_jobs)
         self.assertTrue(app.preview_refreshed)
+        self.assertTrue(getattr(app, "diagnosis_preview_refreshed", False))
 
     def test_thumbnail_render_done_ignores_stale_pdf_results(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
