@@ -98,25 +98,20 @@ def resolve_insert_score_command(
     settings: DiagnosisSettings | None = None,
 ) -> DiagnosisCommand | None:
     settings = settings or DiagnosisSettings()
-    insert_root = Path(project_root).absolute().parent / "manga-insert-point-scorer"
-    python_path = insert_root / ".venv" / "bin" / "python"
-    package_cli = insert_root / "src" / "manga_insert_point_scorer" / "cli.py"
-    if not python_path.exists() or not package_cli.exists():
-        return None
     return DiagnosisCommand(
         (
-            str(python_path),
+            sys.executable,
             "-m",
-            "manga_insert_point_scorer.cli",
+            "manga_pdf_to_epub.diagnosis.insert_point_scorer.cli",
             str(pdf_path),
             "--output",
             str(output_dir),
             "--thumb-height",
             str(settings.insert_thumb_height),
         ),
-        insert_root,
+        Path(project_root),
         Path(output_dir),
-        {"PYTHONPATH": str(insert_root / "src")},
+        {"PYTHONPATH": _builtin_scanner_pythonpath(Path(project_root))},
     )
 
 

@@ -77,7 +77,7 @@ class EpubLayoutDiagnosisIOMixin:
         if command is None:
             messagebox.showerror(
                 "Insert scoring unavailable",
-                "Could not find sibling manga-insert-point-scorer environment. Use Import Insert Scores instead.",
+                "Could not prepare the built-in insert-point scorer. Use Import Insert Scores instead.",
             )
             return
         self._run_background(

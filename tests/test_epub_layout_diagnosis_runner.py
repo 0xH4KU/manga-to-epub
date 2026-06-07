@@ -82,37 +82,41 @@ class DiagnosisRunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             DiagnosisSettings(spread_debug_limit=-1)
 
-    def test_resolves_sibling_insert_point_command_when_present(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            manga_root = Path(tmp)
-            main_root = manga_root / "manga-pdf-to-epub"
-            insert_root = manga_root / "manga-insert-point-scorer"
-            python_path = insert_root / ".venv" / "bin" / "python"
-            package_dir = insert_root / "src" / "manga_insert_point_scorer"
-            python_path.parent.mkdir(parents=True)
-            package_dir.mkdir(parents=True)
-            python_path.write_text("", encoding="utf-8")
-            (package_dir / "cli.py").write_text("", encoding="utf-8")
-            output_dir = main_root / "out"
-
-            command = resolve_insert_score_command(
-                main_root,
-                Path("/books/book.pdf"),
-                output_dir,
-                DiagnosisSettings(insert_thumb_height=720),
-            )
+    def test_resolves_builtin_insert_point_command(self):
+        command = resolve_insert_score_command(
+            Path("/repo/manga-pdf-to-epub"),
+            Path("/books/book.pdf"),
+            Path("/repo/manga-pdf-to-epub/out"),
+            DiagnosisSettings(insert_thumb_height=720),
+        )
 
         self.assertIsInstance(command, DiagnosisCommand)
-        self.assertEqual(insert_root, command.cwd)
+        self.assertEqual(Path("/repo/manga-pdf-to-epub"), command.cwd)
+        self.assertEqual(sys.executable, command.argv[0])
         self.assertEqual("-m", command.argv[1])
-        self.assertIn("manga_insert_point_scorer.cli", command.argv)
+        self.assertEqual("manga_pdf_to_epub.diagnosis.insert_point_scorer.cli", command.argv[2])
         self.assertIn(str(Path("/books/book.pdf")), command.argv)
         self.assertIn("--output", command.argv)
-        self.assertIn(str(output_dir), command.argv)
+        self.assertIn(str(Path("/repo/manga-pdf-to-epub/out")), command.argv)
         self.assertIn("--thumb-height", command.argv)
         self.assertEqual("720", command.argv[command.argv.index("--thumb-height") + 1])
         self.assertIsNotNone(command.env)
-        self.assertEqual(str(insert_root / "src"), command.env["PYTHONPATH"])
+        self.assertIn(str(Path("/repo/manga-pdf-to-epub/src")), command.env["PYTHONPATH"])
+
+    def test_builtin_insert_scorer_module_is_runnable(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "manga_pdf_to_epub.diagnosis.insert_point_scorer.cli",
+                "--help",
+            ],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertIn("--thumb-height", completed.stdout)
 
     def test_run_diagnosis_command_passes_environment_overrides(self):
         with tempfile.TemporaryDirectory() as tmp:
