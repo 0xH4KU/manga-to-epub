@@ -5,6 +5,8 @@ description = "Lossless manga source to EPUB tools for Apple Books layout tuning
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "numpy>=1.26",
+  "opencv-python-headless>=4.10",
   "PyMuPDF>=1.24",
   "Pillow>=10",
   "pillow-heif>=1.0",

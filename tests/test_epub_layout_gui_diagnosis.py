@@ -701,7 +701,7 @@ class DiagnosisSettingsTests(unittest.TestCase):
 
         initialize_diagnosis_state(app, source_page_count=10)
 
-        self.assertEqual(4, app.diagnosis_settings.spread_workers)
+        self.assertEqual(2, app.diagnosis_settings.spread_workers)
         self.assertEqual(0.53, app.diagnosis_settings.spread_threshold)
 
     def test_run_spread_diagnosis_passes_current_settings(self):
@@ -1135,6 +1135,30 @@ class DiagnosisPreviewTests(unittest.TestCase):
         self.assertEqual([(diagnosis_canvas, diagnosis_refs, "Page 1"), (diagnosis_canvas, diagnosis_refs, "Page 2")], app.draws)
         self.assertEqual(["Page 1", "Page 2"], diagnosis_refs)
         self.assertEqual(["main"], app.photo_refs)
+
+    def test_refresh_diagnosis_preview_uses_two_selected_candidate_pages(self):
+        app = EpubLayoutApp.__new__(EpubLayoutApp)
+        diagnosis_canvas = FakeCanvas()
+        diagnosis_refs = []
+        app.model = SimpleNamespace(entries=[page(index) for index in range(1, 74)])
+        app.apple_preview = SimpleNamespace(get=lambda: True)
+        app.diagnosis_window = SimpleNamespace(
+            spine_list=FakeListbox(selection=(70, 71)),
+            preview=diagnosis_canvas,
+            photo_refs=diagnosis_refs,
+        )
+        app.draws = []
+
+        def draw(canvas, photo_refs, entry, *_args):
+            app.draws.append((canvas, photo_refs, entry.label))
+            photo_refs.append(entry.label)
+
+        app._draw_entry_on_canvas = draw
+
+        app.refresh_diagnosis_preview()
+
+        self.assertEqual([(diagnosis_canvas, diagnosis_refs, "Page 71"), (diagnosis_canvas, diagnosis_refs, "Page 72")], app.draws)
+        self.assertEqual(["Page 71", "Page 72"], diagnosis_refs)
 
     def test_refresh_diagnosis_preview_noops_when_window_closed(self):
         app = EpubLayoutApp.__new__(EpubLayoutApp)
@@ -1570,6 +1594,24 @@ class DiagnosisSpreadScanWorkflowTests(unittest.TestCase):
                 candidates = _run_spread_scan_work(SimpleNamespace(), source_page_count=50)
 
         self.assertEqual(["037-038"], [candidate.pair_id for candidate in candidates])
+
+    def test_spread_scan_work_forwards_progress_callback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+            (output_dir / "adjacent_clusters.csv").write_text(
+                "start_page,end_page,decision,spread,review_score\n37,38,review,0.91,0.88\n",
+                encoding="utf-8",
+            )
+            def callback(event):
+                return None
+
+            with patch(
+                "manga_pdf_to_epub.gui.layout_diagnosis_io_controller.run_diagnosis_command",
+                return_value=SimpleNamespace(output_dir=output_dir),
+            ) as run:
+                _run_spread_scan_work(SimpleNamespace(), source_page_count=50, progress_callback=callback)
+
+        self.assertIs(callback, run.call_args.kwargs["progress_callback"])
 
     def test_spread_scan_work_validates_candidates_in_background_phase(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -24,8 +24,29 @@ class EpubLayoutDiagnosisViewMixin:
         window = getattr(self, "diagnosis_window", None)
         if window is None or getattr(window, "preview", None) is None:
             return
-        selected = _first_selection(window.spine_list)
-        self._refresh_preview_canvas(window.preview, window.photo_refs, selected)
+        selection = _listbox_selection(window.spine_list)
+        if len(selection) >= 2:
+            self._refresh_diagnosis_selected_entries(window.preview, window.photo_refs, selection[:2])
+            return
+        self._refresh_preview_canvas(window.preview, window.photo_refs, _first_selection(window.spine_list))
+
+    def _refresh_diagnosis_selected_entries(self, canvas, photo_refs: list, indexes: tuple[int, ...]) -> None:
+        canvas.delete("all")
+        photo_refs.clear()
+        if self.model is None or not self.model.entries:
+            return
+        entries = [self.model.entries[index] for index in indexes if 0 <= index < len(self.model.entries)]
+        if not entries:
+            return
+
+        width = max(400, canvas.winfo_width())
+        height = max(300, canvas.winfo_height())
+        gap = 12
+        page_w = (width - gap * 3) // 2
+        page_h = height - gap * 2
+        slots = self._spread_slots(2, gap, page_w)
+        for entry, (x, y) in zip(entries, slots):
+            self._draw_entry_on_canvas(canvas, photo_refs, entry, x, y, page_w, page_h)
 
     def refresh_diagnosis_spine(self, preserve_yview: bool = False) -> None:
         window = getattr(self, "diagnosis_window", None)

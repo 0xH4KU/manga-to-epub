@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog
 
+from .layout_background_controller import EpubLayoutBackgroundMixin
 from .layout_diagnosis_controller import (
     EpubLayoutDiagnosisMixin,
     initialize_diagnosis_state,
@@ -38,6 +38,7 @@ from ..models.series import SeriesProject, SeriesVolume
 
 
 class EpubLayoutApp(
+    EpubLayoutBackgroundMixin,
     EpubLayoutWorkbenchMixin,
     EpubLayoutInspectorMixin,
     EpubLayoutNavigationMixin,
@@ -105,35 +106,6 @@ class EpubLayoutApp(
             return "break"
         self.delete_selected_entry()
         return None
-
-    def _run_background(self, status_message: str, work, on_success, on_failure=None) -> bool:
-        if getattr(self, "_busy", False):
-            self.status.set("Another operation is already running.")
-            return False
-        self._busy = True
-        self.status.set(status_message)
-        self.root.update_idletasks()
-
-        def worker() -> None:
-            try:
-                result = work()
-                self.root.after(0, lambda: self._background_done(result, on_success))
-            except Exception as exc:
-                self.root.after(0, lambda exc=exc: self._background_failed(exc, on_failure))
-
-        threading.Thread(target=worker, daemon=True).start()
-        return True
-
-    def _background_done(self, result, on_success) -> None:
-        self._busy = False
-        on_success(result)
-
-    def _background_failed(self, exc: Exception, on_failure=None) -> None:
-        self._busy = False
-        if on_failure is None:
-            self._export_failed(exc)
-        else:
-            on_failure(exc)
 
     def open_pdf(self) -> None:
         filename = filedialog.askopenfilename(

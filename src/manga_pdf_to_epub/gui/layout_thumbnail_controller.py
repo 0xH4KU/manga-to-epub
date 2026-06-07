@@ -79,7 +79,10 @@ class EpubLayoutThumbnailMixin:
             return
         try:
             self.thumbnail_cache[cache_key] = tk.PhotoImage(data=png_data)
-            self.refresh_preview()
+            if hasattr(self, "refresh_preview_views"):
+                self.refresh_preview_views()
+            else:
+                self.refresh_preview()
         except Exception:
             if hasattr(self, "status"):
                 self.status.set("Preview thumbnail render failed.")

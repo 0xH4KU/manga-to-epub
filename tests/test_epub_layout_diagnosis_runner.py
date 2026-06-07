@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import unittest
+import subprocess
 from pathlib import Path
 
 from manga_pdf_to_epub.gui.layout_diagnosis_runner import (
@@ -23,53 +24,57 @@ class DiagnosisRunnerTests(unittest.TestCase):
             default_diagnosis_output_dir(root, pdf, "spread"),
         )
 
-    def test_resolves_sibling_spread_continuity_command_when_present(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            manga_root = Path(tmp)
-            main_root = manga_root / "manga-pdf-to-epub"
-            spread_root = manga_root / "manga-spread-continuity"
-            python_path = spread_root / ".venv" / "bin" / "python"
-            script_path = spread_root / "tools" / "scan_pdf_adjacent.py"
-            python_path.parent.mkdir(parents=True)
-            script_path.parent.mkdir(parents=True)
-            python_path.write_text("", encoding="utf-8")
-            script_path.write_text("", encoding="utf-8")
-            output_dir = main_root / "out"
+    def test_resolves_builtin_spread_continuity_command(self):
+        output_dir = Path("/repo/manga-pdf-to-epub/out")
 
-            command = resolve_spread_scan_command(main_root, Path("/books/book.pdf"), output_dir)
+        command = resolve_spread_scan_command(Path("/repo/manga-pdf-to-epub"), Path("/books/book.pdf"), output_dir)
 
         self.assertIsInstance(command, DiagnosisCommand)
-        self.assertEqual(spread_root, command.cwd)
-        self.assertIn("scan_pdf_adjacent.py", command.argv[1])
+        self.assertEqual(Path("/repo/manga-pdf-to-epub"), command.cwd)
+        self.assertEqual(sys.executable, command.argv[0])
+        self.assertEqual("-m", command.argv[1])
+        self.assertEqual("manga_pdf_to_epub.diagnosis.spread_continuity.scan_pdf_adjacent", command.argv[2])
         self.assertIn("--reading", command.argv)
         self.assertIn("--workers", command.argv)
-        self.assertEqual("4", command.argv[command.argv.index("--workers") + 1])
+        self.assertIn("--progress", command.argv)
+        self.assertEqual("2", command.argv[command.argv.index("--workers") + 1])
+        self.assertEqual("20", command.argv[command.argv.index("--debug-limit") + 1])
+        self.assertEqual("900", command.argv[command.argv.index("--max-height") + 1])
+        self.assertIsNotNone(command.env)
+        self.assertIn(str(Path("/repo/manga-pdf-to-epub/src")), command.env["PYTHONPATH"])
 
     def test_spread_command_uses_manual_diagnosis_settings(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            manga_root = Path(tmp)
-            main_root = manga_root / "manga-pdf-to-epub"
-            spread_root = manga_root / "manga-spread-continuity"
-            python_path = spread_root / ".venv" / "bin" / "python"
-            script_path = spread_root / "tools" / "scan_pdf_adjacent.py"
-            python_path.parent.mkdir(parents=True)
-            script_path.parent.mkdir(parents=True)
-            python_path.write_text("", encoding="utf-8")
-            script_path.write_text("", encoding="utf-8")
-            settings = DiagnosisSettings(
-                spread_workers=6,
-                spread_threshold=0.61,
-                spread_debug_limit=12,
-                spread_max_height=1400,
-                insert_thumb_height=800,
-            )
+        settings = DiagnosisSettings(
+            spread_workers=6,
+            spread_threshold=0.61,
+            spread_debug_limit=12,
+            spread_max_height=1400,
+            insert_thumb_height=800,
+        )
 
-            command = resolve_spread_scan_command(main_root, Path("/books/book.pdf"), main_root / "out", settings)
+        command = resolve_spread_scan_command(Path("/repo/manga-pdf-to-epub"), Path("/books/book.pdf"), Path("/repo/out"), settings)
 
         self.assertEqual("6", command.argv[command.argv.index("--workers") + 1])
         self.assertEqual("0.61", command.argv[command.argv.index("--spread-threshold") + 1])
         self.assertEqual("12", command.argv[command.argv.index("--debug-limit") + 1])
         self.assertEqual("1400", command.argv[command.argv.index("--max-height") + 1])
+
+    def test_builtin_spread_scanner_module_is_runnable(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "manga_pdf_to_epub.diagnosis.spread_continuity.scan_pdf_adjacent",
+                "--help",
+            ],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertIn("--workers", completed.stdout)
+        self.assertIn("--max-height", completed.stdout)
+        self.assertIn("--progress", completed.stdout)
 
     def test_diagnosis_settings_reject_invalid_values(self):
         with self.assertRaises(ValueError):
@@ -79,43 +84,41 @@ class DiagnosisRunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             DiagnosisSettings(spread_debug_limit=-1)
 
-    def test_missing_sibling_spread_command_returns_none(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            command = resolve_spread_scan_command(Path(tmp) / "manga-pdf-to-epub", Path("/books/book.pdf"), Path(tmp) / "out")
-
-        self.assertIsNone(command)
-
-    def test_resolves_sibling_insert_point_command_when_present(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            manga_root = Path(tmp)
-            main_root = manga_root / "manga-pdf-to-epub"
-            insert_root = manga_root / "manga-insert-point-scorer"
-            python_path = insert_root / ".venv" / "bin" / "python"
-            package_dir = insert_root / "src" / "manga_insert_point_scorer"
-            python_path.parent.mkdir(parents=True)
-            package_dir.mkdir(parents=True)
-            python_path.write_text("", encoding="utf-8")
-            (package_dir / "cli.py").write_text("", encoding="utf-8")
-            output_dir = main_root / "out"
-
-            command = resolve_insert_score_command(
-                main_root,
-                Path("/books/book.pdf"),
-                output_dir,
-                DiagnosisSettings(insert_thumb_height=720),
-            )
+    def test_resolves_builtin_insert_point_command(self):
+        command = resolve_insert_score_command(
+            Path("/repo/manga-pdf-to-epub"),
+            Path("/books/book.pdf"),
+            Path("/repo/manga-pdf-to-epub/out"),
+            DiagnosisSettings(insert_thumb_height=720),
+        )
 
         self.assertIsInstance(command, DiagnosisCommand)
-        self.assertEqual(insert_root, command.cwd)
+        self.assertEqual(Path("/repo/manga-pdf-to-epub"), command.cwd)
+        self.assertEqual(sys.executable, command.argv[0])
         self.assertEqual("-m", command.argv[1])
-        self.assertIn("manga_insert_point_scorer.cli", command.argv)
+        self.assertEqual("manga_pdf_to_epub.diagnosis.insert_point_scorer.cli", command.argv[2])
         self.assertIn(str(Path("/books/book.pdf")), command.argv)
         self.assertIn("--output", command.argv)
-        self.assertIn(str(output_dir), command.argv)
+        self.assertIn(str(Path("/repo/manga-pdf-to-epub/out")), command.argv)
         self.assertIn("--thumb-height", command.argv)
         self.assertEqual("720", command.argv[command.argv.index("--thumb-height") + 1])
         self.assertIsNotNone(command.env)
-        self.assertEqual(str(insert_root / "src"), command.env["PYTHONPATH"])
+        self.assertIn(str(Path("/repo/manga-pdf-to-epub/src")), command.env["PYTHONPATH"])
+
+    def test_builtin_insert_scorer_module_is_runnable(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "manga_pdf_to_epub.diagnosis.insert_point_scorer.cli",
+                "--help",
+            ],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertIn("--thumb-height", completed.stdout)
 
     def test_run_diagnosis_command_passes_environment_overrides(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -136,6 +139,33 @@ class DiagnosisRunnerTests(unittest.TestCase):
             )
 
         self.assertIn("ok", result.stdout)
+
+    def test_run_diagnosis_command_streams_progress_events_from_stderr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            script_path = tmp_path / "progress.py"
+            script_path.write_text(
+                "import sys\n"
+                "print('MTE_PROGRESS {\"completed\": 1, \"total\": 3, \"message\": \"Rendering 1/3\"}', file=sys.stderr, flush=True)\n"
+                "print('ordinary warning', file=sys.stderr, flush=True)\n"
+                "print('done')\n",
+                encoding="utf-8",
+            )
+            events = []
+
+            result = run_diagnosis_command(
+                DiagnosisCommand(
+                    (sys.executable, str(script_path)),
+                    cwd=tmp_path,
+                    output_dir=tmp_path / "out",
+                ),
+                progress_callback=events.append,
+            )
+
+        self.assertEqual([{"completed": 1, "total": 3, "message": "Rendering 1/3"}], events)
+        self.assertIn("done", result.stdout)
+        self.assertIn("ordinary warning", result.stderr)
+        self.assertNotIn("MTE_PROGRESS", result.stderr)
 
 
 if __name__ == "__main__":
